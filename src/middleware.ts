@@ -4,7 +4,7 @@ import { sessionOptions, SessionData } from "@/lib/session";
 
 const PUBLIC_PATHS = ["/login", "/api/login"];
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.includes(pathname)) {

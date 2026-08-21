@@ -41,5 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local dev server log
+# local dev/prod server logs
 .dev-server.log
+.prod-server.log
