@@ -94,7 +94,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
         <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
         <p className="text-sm text-slate-500">Warehouse stock overview and order entry.</p>
@@ -200,33 +200,35 @@ export default function DashboardPage() {
               <div className="border-b border-gray-100 px-5 py-4">
                 <h2 className="text-sm font-semibold text-slate-900">Stock</h2>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-                    <th className="px-5 py-3">Product</th>
-                    <th className="px-5 py-3">Cost</th>
-                    <th className="px-5 py-3">GST</th>
-                    <th className="px-5 py-3">In stock</th>
-                    <th className="px-5 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p.name} className="border-b border-gray-50 last:border-0">
-                      <td className="px-5 py-3 font-medium text-slate-900">{p.name}</td>
-                      <td className="px-5 py-3 text-slate-600">
-                        {currency}
-                        {p.cost.toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3 text-slate-600">{p.gstRate}%</td>
-                      <td className="px-5 py-3 text-slate-600">{p.stock}</td>
-                      <td className="px-5 py-3">
-                        <StatusPill stock={p.stock} />
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                      <th className="whitespace-nowrap px-5 py-3">Product</th>
+                      <th className="whitespace-nowrap px-5 py-3">Cost</th>
+                      <th className="whitespace-nowrap px-5 py-3">GST</th>
+                      <th className="whitespace-nowrap px-5 py-3">In stock</th>
+                      <th className="whitespace-nowrap px-5 py-3">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => (
+                      <tr key={p.name} className="border-b border-gray-50 last:border-0">
+                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">{p.name}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">
+                          {currency}
+                          {p.cost.toLocaleString()}
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">{p.gstRate}%</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">{p.stock}</td>
+                        <td className="whitespace-nowrap px-5 py-3">
+                          <StatusPill stock={p.stock} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </section>
           </div>
         </>

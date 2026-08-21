@@ -79,7 +79,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-8 py-8">
+    <main className="mx-auto max-w-2xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
         <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
         <p className="text-sm text-slate-500">
@@ -94,7 +94,7 @@ export default function SettingsPage() {
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+          className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
         >
           <Field label="Company name">
             <input
@@ -114,7 +114,7 @@ export default function SettingsPage() {
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Phone">
               <input
                 type="text"
@@ -133,7 +133,7 @@ export default function SettingsPage() {
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="GSTIN / Tax ID" hint="Leave blank if not applicable">
               <input
                 type="text"

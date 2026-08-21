@@ -145,7 +145,7 @@ export default function StockEntryPage() {
   const restockCurrent = products.find((p) => p.name === restockProduct);
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
         <h1 className="text-xl font-semibold text-slate-900">Stock Entry</h1>
         <p className="text-sm text-slate-500">Add stock, set GST rates, or register a new product.</p>

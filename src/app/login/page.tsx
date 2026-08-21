@@ -32,8 +32,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center bg-slate-900 px-6">
-      <div className="w-full max-w-sm rounded-lg border border-slate-800 bg-white p-8 shadow-xl">
+    <main className="flex min-h-screen w-full items-center justify-center bg-slate-900 px-4">
+      <div className="w-full max-w-sm rounded-lg border border-slate-800 bg-white p-6 shadow-xl sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
           Inventory Console
         </p>
