@@ -1,7 +1,31 @@
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getOrderById, getSettings } from "@/lib/db";
+import { getOrderById as fetchOrderById, getSettings } from "@/lib/db";
 import PrintButton from "@/components/PrintButton";
+
+// Memoized so generateMetadata() and the page body share one DB call per request.
+const getOrderById = cache(fetchOrderById);
+
+function invoiceNumberFor(orderId: number) {
+  return `INV-${String(orderId).padStart(6, "0")}`;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const orderId = Number(id);
+  if (!Number.isInteger(orderId)) return {};
+
+  const order = await getOrderById(orderId);
+  if (!order) return {};
+
+  return { title: `Invoice No: ${invoiceNumberFor(order.id)}` };
+}
 
 export default async function InvoicePage({
   params,
@@ -19,7 +43,7 @@ export default async function InvoicePage({
     notFound();
   }
 
-  const invoiceNumber = `INV-${String(order.id).padStart(6, "0")}`;
+  const invoiceNumber = invoiceNumberFor(order.id);
   const date = new Date(order.createdAt).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
