@@ -74,7 +74,7 @@ Vercel.
 - `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
   (`src/components/Sidebar.tsx`); routes inside it, in nav order:
   - `page.tsx` — **Dashboard**: KPI tiles (products, units in stock, low stock,
-    inventory value) and the multi-item order builder (add products to a cart,
+    inventory value) and the "New sale" cart builder (add products to a cart,
     required customer name + address, one invoice on submit). No stock table here —
     that lives on its own tab so the order-entry screen stays focused.
   - `stock/page.tsx` — **Stock**: every product's cost, GST rate, current stock and

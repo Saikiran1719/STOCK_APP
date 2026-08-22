@@ -110,7 +110,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setMessage({ type: "error", text: data.error || "Order failed." });
+        setMessage({ type: "error", text: data.error || "Sale failed." });
         return;
       }
       if (data.invoiceId != null) {
@@ -118,7 +118,7 @@ export default function DashboardPage() {
         router.push(`/invoices/${data.invoiceId}`);
         return;
       }
-      setMessage({ type: "error", text: "Order placed, but no invoice was returned." });
+      setMessage({ type: "error", text: "Sale recorded, but no invoice was returned." });
     } finally {
       setSubmitting(false);
     }
@@ -129,13 +129,13 @@ export default function DashboardPage() {
       <header className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Overview</p>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted">Stock overview and order entry.</p>
+        <p className="mt-1 text-sm text-muted">Stock overview and billing.</p>
       </header>
 
       {demo && !loading && !loadError && (
         <p className="mb-6 rounded-xl border border-warn/30 bg-warn-bg px-3 py-2 text-xs text-warn">
-          Demo mode: showing sample data, not the real Supabase database. Orders placed here
-          only change this in-memory copy (resets on server restart) until Supabase
+          Demo mode: showing sample data, not the real Supabase database. Sales recorded
+          here only change this in-memory copy (resets on server restart) until Supabase
           credentials are set in .env.local / Vercel.
         </p>
       )}
@@ -163,7 +163,7 @@ export default function DashboardPage() {
           </div>
 
           <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-            <h2 className="mb-4 text-sm font-semibold text-ink">🛒 Place order</h2>
+            <h2 className="mb-4 text-sm font-semibold text-ink">🛒 New sale</h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="customer">
@@ -278,7 +278,7 @@ export default function DashboardPage() {
                 disabled={submitting || !canSubmit}
                 className="rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
               >
-                {submitting ? "Placing order…" : "Place order"}
+                {submitting ? "Creating invoice…" : "Create invoice"}
               </button>
             </form>
 
