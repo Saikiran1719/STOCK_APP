@@ -16,10 +16,18 @@ type Adjustment = {
 
 const GST_RATES = [5, 18];
 
+type SectionKey = "add" | "remove" | "edit" | "new";
+
 export default function StockEntryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+
+  // Which action card is expanded — only one at a time, to keep the page short.
+  const [openSection, setOpenSection] = useState<SectionKey | null>(null);
+  function toggleSection(key: SectionKey) {
+    setOpenSection((prev) => (prev === key ? null : key));
+  }
 
   // Add stock form
   const [restockProduct, setRestockProduct] = useState("");
@@ -218,12 +226,13 @@ export default function StockEntryPage() {
   const removeCurrent = products.find((p) => p.name === removeProduct);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
+    <main className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Inventory</p>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Stock Entry</h1>
         <p className="mt-1 text-sm text-muted">
-          Add or remove stock, edit a product&apos;s price/GST rate, or register a new product.
+          Add or remove stock, edit a product&apos;s price/GST rate, or register a new product. Tap
+          a card to open it.
         </p>
       </header>
 
@@ -232,9 +241,13 @@ export default function StockEntryPage() {
       ) : loadError ? (
         <p className="text-sm text-err">{loadError}</p>
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-            <h2 className="mb-4 text-sm font-semibold text-ink">➕ Add stock</h2>
+        <div className="flex flex-col gap-3">
+          <AccordionCard
+            icon="➕"
+            title="Add stock"
+            isOpen={openSection === "add"}
+            onToggle={() => toggleSection("add")}
+          >
             {products.length === 0 ? (
               <p className="text-sm text-muted">No products yet — add one first.</p>
             ) : (
@@ -287,21 +300,19 @@ export default function StockEntryPage() {
             )}
 
             {restockMessage && (
-              <p
-                className={`mt-4 text-sm ${
-                  restockMessage.type === "ok" ? "text-ok" : "text-err"
-                }`}
-              >
+              <p className={`mt-4 text-sm ${restockMessage.type === "ok" ? "text-ok" : "text-err"}`}>
                 {restockMessage.text}
               </p>
             )}
-          </section>
+          </AccordionCard>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-            <h2 className="mb-4 text-sm font-semibold text-ink">➖ Remove stock</h2>
-            <p className="mb-4 -mt-2 text-xs text-muted">
-              For correcting a physical stock count mismatch — not a sale.
-            </p>
+          <AccordionCard
+            icon="➖"
+            title="Remove stock"
+            subtitle="For correcting a physical stock count mismatch — not a sale."
+            isOpen={openSection === "remove"}
+            onToggle={() => toggleSection("remove")}
+          >
             {products.length === 0 ? (
               <p className="text-sm text-muted">No products yet — add one first.</p>
             ) : (
@@ -373,19 +384,19 @@ export default function StockEntryPage() {
             )}
 
             {removeMessage && (
-              <p
-                className={`mt-4 text-sm ${
-                  removeMessage.type === "ok" ? "text-ok" : "text-err"
-                }`}
-              >
+              <p className={`mt-4 text-sm ${removeMessage.type === "ok" ? "text-ok" : "text-err"}`}>
                 {removeMessage.text}
               </p>
             )}
-          </section>
+          </AccordionCard>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-            <h2 className="mb-4 text-sm font-semibold text-ink">✏️ Edit product</h2>
-            <p className="mb-4 -mt-2 text-xs text-muted">Update an existing product&apos;s price or GST rate.</p>
+          <AccordionCard
+            icon="✏️"
+            title="Edit product"
+            subtitle="Update an existing product's price or GST rate."
+            isOpen={openSection === "edit"}
+            onToggle={() => toggleSection("edit")}
+          >
             {products.length === 0 ? (
               <p className="text-sm text-muted">No products yet — add one first.</p>
             ) : (
@@ -456,10 +467,14 @@ export default function StockEntryPage() {
                 {editMessage.text}
               </p>
             )}
-          </section>
+          </AccordionCard>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)] lg:col-span-2">
-            <h2 className="mb-4 text-sm font-semibold text-ink">🆕 Add new product</h2>
+          <AccordionCard
+            icon="🆕"
+            title="Add new product"
+            isOpen={openSection === "new"}
+            onToggle={() => toggleSection("new")}
+          >
             <form onSubmit={handleCreateProduct} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-xs font-medium text-muted" htmlFor="new-name">
@@ -531,15 +546,11 @@ export default function StockEntryPage() {
             </form>
 
             {newMessage && (
-              <p
-                className={`mt-4 text-sm ${
-                  newMessage.type === "ok" ? "text-ok" : "text-err"
-                }`}
-              >
+              <p className={`mt-4 text-sm ${newMessage.type === "ok" ? "text-ok" : "text-err"}`}>
                 {newMessage.text}
               </p>
             )}
-          </section>
+          </AccordionCard>
         </div>
       )}
 
@@ -593,5 +604,49 @@ export default function StockEntryPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function AccordionCard({
+  icon,
+  title,
+  subtitle,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
+      >
+        <span className="flex items-center gap-2.5">
+          <span className="text-base" aria-hidden>
+            {icon}
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-ink">{title}</span>
+            {subtitle && <span className="mt-0.5 block text-xs text-muted">{subtitle}</span>}
+          </span>
+        </span>
+        <span
+          className={`shrink-0 text-muted transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}
+          aria-hidden
+        >
+          ▾
+        </span>
+      </button>
+      {isOpen && <div className="border-t border-border px-5 py-5">{children}</div>}
+    </section>
   );
 }
