@@ -108,38 +108,38 @@ export default function SettingsPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Configuration</p>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Settings</h1>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Configuration</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Settings</h1>
+        <p className="mt-1 text-sm text-muted">
           Company details shown on printed invoices.
         </p>
       </header>
 
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-muted">Loading…</p>
       ) : loadError ? (
-        <p className="text-sm text-red-600">{loadError}</p>
+        <p className="text-sm text-err">{loadError}</p>
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-2xl border border-stone-100 bg-white p-4 shadow-md sm:p-6"
+          className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)] sm:p-6"
         >
-          <Field label="Logo" hint="Shown in the sidebar and on invoices. Under 500KB.">
+          <Field label="Logo" hint="Shown in the header and on invoices. Under 500KB.">
             <div className="flex items-center gap-4">
               {settings.logoDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={settings.logoDataUrl}
                   alt="Company logo preview"
-                  className="h-14 w-14 rounded-xl border border-stone-200 object-contain"
+                  className="h-14 w-14 rounded-lg border border-border object-contain"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-stone-300 text-xs text-stone-400">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-line text-xs text-muted">
                   No logo
                 </div>
               )}
               <div className="flex flex-col gap-1">
-                <label className="w-fit cursor-pointer rounded-xl border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50">
+                <label className="w-fit cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted hover:bg-stripe">
                   Choose image
                   <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
                 </label>
@@ -147,14 +147,14 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => update("logoDataUrl", "")}
-                    className="w-fit text-xs text-red-600 hover:underline"
+                    className="w-fit text-xs text-err hover:underline"
                   >
                     Remove logo
                   </button>
                 )}
               </div>
             </div>
-            {logoError && <p className="mt-1 text-xs text-red-600">{logoError}</p>}
+            {logoError && <p className="mt-1 text-xs text-err">{logoError}</p>}
           </Field>
 
           <Field label="Company name">
@@ -162,7 +162,7 @@ export default function SettingsPage() {
               type="text"
               value={settings.companyName}
               onChange={(e) => update("companyName", e.target.value)}
-              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </Field>
 
@@ -171,7 +171,7 @@ export default function SettingsPage() {
               value={settings.address}
               onChange={(e) => update("address", e.target.value)}
               rows={2}
-              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </Field>
 
@@ -181,7 +181,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.phone}
                 onChange={(e) => update("phone", e.target.value)}
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </Field>
             <Field label="Email">
@@ -189,7 +189,7 @@ export default function SettingsPage() {
                 type="email"
                 value={settings.email}
                 onChange={(e) => update("email", e.target.value)}
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </Field>
           </div>
@@ -200,7 +200,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.gstin}
                 onChange={(e) => update("gstin", e.target.value)}
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </Field>
             <Field label="Currency symbol" hint="e.g. ₹, $, Rs.">
@@ -208,7 +208,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.currencySymbol}
                 onChange={(e) => update("currencySymbol", e.target.value)}
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </Field>
           </div>
@@ -218,20 +218,20 @@ export default function SettingsPage() {
               type="text"
               value={settings.invoiceNote}
               onChange={(e) => update("invoiceNote", e.target.value)}
-              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+              className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </Field>
 
           <button
             type="submit"
             disabled={saving}
-            className="mt-2 self-start rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
+            className="mt-2 self-start rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
           >
             {saving ? "Saving…" : "Save settings"}
           </button>
 
           {message && (
-            <p className={`text-sm ${message.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
+            <p className={`text-sm ${message.type === "ok" ? "text-ok" : "text-err"}`}>
               {message.text}
             </p>
           )}
@@ -252,9 +252,9 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-stone-600">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-muted">{label}</label>
       {children}
-      {hint && <p className="mt-1 text-xs text-stone-400">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
     </div>
   );
 }

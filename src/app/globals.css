@@ -1,20 +1,61 @@
 @import "tailwindcss";
 
+/* ---- Modern SAP Fiori / Horizon theme ---- */
 :root {
-  --background: #f6f5f1;
-  --foreground: #1c1917;
+  --bg: #e9edf3; /* light blue-gray workspace */
+  --card: #ffffff;
+  --border: #dce3ec;
+  --line: #aebccb; /* input/interactive borders, a touch darker than --border */
+  --head: #eef2f8; /* table header tint */
+  --stripe: #f8fafc; /* zebra row tint */
+  --ink: #1d2d3e;
+  --muted: #556b82;
+  --navy: #16324f; /* header navy */
+  --navy-2: #24507e;
+  --gold: #f0ab00; /* accent border under the header */
+  --accent: #0a6ed1; /* primary blue */
+  --accent-dark: #0857a6;
+  --accent-soft: #eaf3fc;
+  --ok: #256f3a;
+  --ok-bg: #e6f4ea;
+  --err: #aa0808;
+  --err-bg: #fdecec;
+  --warn: #e76500;
+  --warn-bg: #fdf1e0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-jakarta);
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-line: var(--line);
+  --color-head: var(--head);
+  --color-stripe: var(--stripe);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-gold: var(--gold);
+  --color-accent: var(--accent);
+  --color-accent-dark: var(--accent-dark);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-err: var(--err);
+  --color-err-bg: var(--err-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--ink);
 }
 
 @media print {

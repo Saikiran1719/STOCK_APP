@@ -8,23 +8,30 @@ Vercel.
 
 ## Look and feel
 
+- **Brand identity** — **CounterBook** (renamed from the internal "Stock Warehouse"
+  project name). Visual style is a "Modern SAP Fiori / Horizon" theme: a navy gradient
+  header with a gold accent line, SAP-blue (`#0a6ed1`) primary actions, a light
+  blue-gray workspace background, Poppins for headings/UI text, and dense
+  bordered/striped/hover-highlighted tables — closer to the polished, professional feel
+  of SAP Business One / Fiori-style ERP consoles than a generic admin-template look.
+  All theme colors are CSS custom properties in `src/app/globals.css`, mapped into
+  Tailwind v4's `@theme inline` block (`bg-navy`, `text-accent`, `bg-card`,
+  `border-line`, `text-ok`/`text-err`/`text-warn`, etc.) so the palette is defined once
+  and used as ordinary utility classes everywhere.
+- **Navigation** — a top navy header (product brand + the logged-in company's own logo,
+  or a generated monogram) with a horizontally-scrollable tab bar underneath
+  (`src/components/AppHeader.tsx`) — no sidebar/hamburger drawer; on narrow screens the
+  tabs just scroll instead of collapsing into a menu.
 - **Company logo** — upload one on Settings (stored as a data URL on `company_settings`,
-  no separate file storage needed). Shows in the sidebar (with a generated colored
+  no separate file storage needed). Shows in the header (with a generated gold
   monogram as the fallback when there's no logo yet) and on every invoice header.
 - **Product avatars** — every product gets a deterministic colored initial avatar
-  (`src/lib/productColor.ts` hashes the name to a fixed palette), so the same product
-  reads as the same color everywhere — stock tables, the order cart, stock adjustment
-  history.
+  (`src/lib/productColor.ts` hashes the name to a fixed palette, independent of the
+  brand theme), so the same product reads as the same color everywhere — the Stock
+  table, the order cart, stock adjustment history.
 - **Status at a glance** — stock/payment/void indicators are icon-prefixed pills
   (✓ In stock, ⚠ Low stock, ✕ Out of stock, ✓ Paid, ◐ Partial, ! Unpaid, ⊘ Voided) rather
   than plain colored text, and card headers carry a small icon each.
-- **Brand identity** — renamed from the internal "Stock Warehouse" project name to
-  **CounterBook**. Accent color is teal/emerald throughout (buttons, focus rings, active
-  nav, the sidebar's top gradient bar, the login screen), set against warm stone
-  neutrals (not cold gray) and Plus Jakarta Sans for headings/UI text — deliberately
-  distinct from generic admin-template blue/Inter, closer to the polished, approachable
-  feel of consumer billing apps like Vyapar. The sidebar itself uses a custom dark teal
-  ink color rather than a default slate/black.
 
 ## How it works
 
@@ -63,15 +70,19 @@ Vercel.
   page), `invoices/[id]/void` (POST), `reports` (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
-- `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
-  (`src/components/Sidebar.tsx`); routes inside it:
-  - `page.tsx` — **Dashboard**: KPI tiles, multi-item order builder (add products to a
-    cart, required customer name + address, one invoice), stock table.
+- `src/app/(app)/` — the app shell: `layout.tsx` renders the header + tab bar
+  (`src/components/AppHeader.tsx`); routes inside it, in tab order:
+  - `page.tsx` — **Dashboard**: KPI tiles (products, units in stock, low stock,
+    inventory value) and the multi-item order builder (add products to a cart,
+    required customer name + address, one invoice on submit). No stock table here —
+    that lives on its own tab so the order-entry screen stays focused.
+  - `stock/page.tsx` — **Stock**: every product's cost, GST rate, current stock and
+    status, in a searchable bordered/striped table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
     date filter, a customer/product search box, and a payment-status column — find one
     and reprint it. Voided invoices show struck through with a "Voided" badge.
   - `invoices/[id]/page.tsx` — the printable invoice itself (client-rendered, fetches
-    from `/api/invoices/[id]`; the sidebar and back/print controls are hidden via
+    from `/api/invoices/[id]`; the header/tabs and back/print controls are hidden via
     `print:` classes when actually printed — use the Print button, or the browser's own
     print dialog / Ctrl+P). Sets the page title to `Invoice No: INV-000123`, which
     browsers use as the print header and default PDF filename. Below the invoice

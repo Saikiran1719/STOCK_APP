@@ -125,15 +125,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
+    <main className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Overview</p>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-stone-500">Stock overview and order entry.</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Overview</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted">Stock overview and order entry.</p>
       </header>
 
       {demo && !loading && !loadError && (
-        <p className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="mb-6 rounded-xl border border-warn/30 bg-warn-bg px-3 py-2 text-xs text-warn">
           Demo mode: showing sample data, not the real Supabase database. Orders placed here
           only change this in-memory copy (resets on server restart) until Supabase
           credentials are set in .env.local / Vercel.
@@ -141,12 +141,12 @@ export default function DashboardPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-muted">Loading…</p>
       ) : loadError ? (
-        <p className="text-sm text-red-600">{loadError}</p>
+        <p className="text-sm text-err">{loadError}</p>
       ) : (
         <>
-          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <KpiTile icon="📦" label="Products" value={totalProducts} />
             <KpiTile icon="📊" label="Units in stock" value={totalUnits} />
             <KpiTile
@@ -162,174 +162,130 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-            <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md lg:col-span-2">
-              <h2 className="mb-4 text-sm font-semibold text-stone-900">🛒 Place order</h2>
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="customer">
-                    Customer name
-                  </label>
-                  <input
-                    id="customer"
-                    type="text"
-                    required
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
-                    placeholder="Shown on the invoice"
-                  />
-                </div>
+          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <h2 className="mb-4 text-sm font-semibold text-ink">🛒 Place order</h2>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="customer">
+                  Customer name
+                </label>
+                <input
+                  id="customer"
+                  type="text"
+                  required
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  placeholder="Shown on the invoice"
+                />
+              </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="customer-address">
-                    Customer address
-                  </label>
-                  <textarea
-                    id="customer-address"
-                    required
-                    value={customerAddress}
-                    onChange={(e) => setCustomerAddress(e.target.value)}
-                    rows={2}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
-                    placeholder="Billing address, shown on the invoice"
-                  />
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="customer-address">
+                  Customer address
+                </label>
+                <textarea
+                  id="customer-address"
+                  required
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  placeholder="Billing address, shown on the invoice"
+                />
+              </div>
 
-                <div className="rounded-xl border border-stone-200 p-3">
-                  <p className="mb-2 text-xs font-medium text-stone-600">Add item</p>
-                  <select
-                    value={pickProduct}
-                    onChange={(e) => {
-                      setPickProduct(e.target.value);
-                      setPickQty(1);
-                    }}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
-                  >
-                    {products.map((p) => (
-                      <option key={p.name} value={p.name} disabled={remainingStock(p.name) <= 0}>
-                        {p.name} — {remainingStock(p.name)} available
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={pickAvailable || undefined}
-                      value={pickQty}
-                      onChange={(e) => setPickQty(Number(e.target.value))}
-                      className="w-20 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
-                    />
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      disabled={!pickProduct || pickQty < 1 || pickQty > pickAvailable}
-                      className="flex-1 whitespace-nowrap rounded-xl border border-teal-600 px-3 py-2 text-sm font-medium text-teal-600 transition hover:bg-teal-50 disabled:opacity-50"
-                    >
-                      Add item
-                    </button>
-                  </div>
-                </div>
-
-                {cart.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-stone-200">
-                    {cart.map((item, i) => {
-                      const line = lineTotal(item);
-                      return (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between gap-2 border-b border-stone-100 px-3 py-2 text-sm last:border-0"
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <ProductAvatar name={item.name} />
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-stone-900">
-                                {item.name} × {item.qty}
-                              </p>
-                              <p className="text-xs text-stone-500">
-                                {currency}
-                                {line.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(i)}
-                            aria-label={`Remove ${item.name}`}
-                            className="shrink-0 rounded-xl px-2 py-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      );
-                    })}
-                    <div className="flex items-center justify-between bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-900">
-                      <span>Total</span>
-                      <span>
-                        {currency}
-                        {cartTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={submitting || !canSubmit}
-                  className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
+              <div className="rounded-lg border border-border p-3">
+                <p className="mb-2 text-xs font-medium text-muted">Add item</p>
+                <select
+                  value={pickProduct}
+                  onChange={(e) => {
+                    setPickProduct(e.target.value);
+                    setPickQty(1);
+                  }}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                 >
-                  {submitting ? "Placing order…" : "Place order"}
-                </button>
-              </form>
-
-              {message && (
-                <p className={`mt-4 text-sm ${message.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
-                  {message.text}
-                </p>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-stone-100 bg-white shadow-md lg:col-span-3">
-              <div className="border-b border-stone-100 px-5 py-4">
-                <h2 className="text-sm font-semibold text-stone-900">📦 Stock</h2>
+                  {products.map((p) => (
+                    <option key={p.name} value={p.name} disabled={remainingStock(p.name) <= 0}>
+                      {p.name} — {remainingStock(p.name)} available
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={pickAvailable || undefined}
+                    value={pickQty}
+                    onChange={(e) => setPickQty(Number(e.target.value))}
+                    className="w-20 rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    disabled={!pickProduct || pickQty < 1 || pickQty > pickAvailable}
+                    className="flex-1 whitespace-nowrap rounded-lg border border-accent px-3 py-2 text-sm font-medium text-accent transition hover:bg-accent-soft disabled:opacity-45"
+                  >
+                    Add item
+                  </button>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-stone-100 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
-                      <th className="whitespace-nowrap px-5 py-3">Product</th>
-                      <th className="whitespace-nowrap px-5 py-3">Cost</th>
-                      <th className="whitespace-nowrap px-5 py-3">GST</th>
-                      <th className="whitespace-nowrap px-5 py-3">In stock</th>
-                      <th className="whitespace-nowrap px-5 py-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {products.map((p) => (
-                      <tr key={p.name} className="border-b border-stone-50 last:border-0">
-                        <td className="whitespace-nowrap px-5 py-3">
-                          <div className="flex items-center gap-2 font-medium text-stone-900">
-                            <ProductAvatar name={p.name} />
-                            {p.name}
+
+              {cart.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-border">
+                  {cart.map((item, i) => {
+                    const line = lineTotal(item);
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm last:border-0"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <ProductAvatar name={item.name} />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-ink">
+                              {item.name} × {item.qty}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {currency}
+                              {line.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            </p>
                           </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-stone-600">
-                          {currency}
-                          {p.cost.toLocaleString()}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-stone-600">{p.gstRate}%</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-stone-600">{p.stock}</td>
-                        <td className="whitespace-nowrap px-5 py-3">
-                          <StatusPill stock={p.stock} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(i)}
+                          aria-label={`Remove ${item.name}`}
+                          className="shrink-0 rounded-lg px-2 py-1 text-muted hover:bg-err-bg hover:text-err"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between bg-stripe px-3 py-2 text-sm font-semibold text-ink">
+                    <span>Total</span>
+                    <span>
+                      {currency}
+                      {cartTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || !canSubmit}
+                className="rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
+              >
+                {submitting ? "Placing order…" : "Place order"}
+              </button>
+            </form>
+
+            {message && (
+              <p className={`mt-4 text-sm ${message.type === "ok" ? "text-ok" : "text-err"}`}>{message.text}</p>
+            )}
+          </section>
         </>
       )}
     </main>
@@ -348,47 +304,25 @@ function KpiTile({
   tone?: "default" | "warn";
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-stone-100 bg-white p-4 shadow-md">
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
       <span
-        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
-          tone === "warn" ? "bg-amber-50" : "bg-teal-50"
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xl ${
+          tone === "warn" ? "bg-warn-bg" : "bg-accent-soft"
         }`}
         aria-hidden
       >
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="truncate text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
+        <p className="truncate text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
         <p
-          className={`mt-0.5 text-2xl font-bold tabular-nums ${
-            tone === "warn" ? "text-amber-600" : "text-stone-900"
+          className={`mt-0.5 truncate text-2xl font-bold tabular-nums ${
+            tone === "warn" ? "text-warn" : "text-ink"
           }`}
         >
           {value}
         </p>
       </div>
     </div>
-  );
-}
-
-function StatusPill({ stock }: { stock: number }) {
-  if (stock <= 0) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-        ✕ Out of stock
-      </span>
-    );
-  }
-  if (stock <= LOW_STOCK_THRESHOLD) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-        ⚠ Low stock
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-      ✓ In stock
-    </span>
   );
 }

@@ -90,20 +90,20 @@ export default function InvoicesPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Billing history</p>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Invoices</h1>
-        <p className="mt-1 text-sm text-stone-500">Every invoice ever placed — find one to reprint.</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Billing history</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Invoices</h1>
+        <p className="mt-1 text-sm text-muted">Every invoice ever placed — find one to reprint.</p>
       </header>
 
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-muted">Loading…</p>
       ) : loadError ? (
-        <p className="text-sm text-red-600">{loadError}</p>
+        <p className="text-sm text-err">{loadError}</p>
       ) : (
         <>
-          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-stone-100 bg-white p-4 shadow-md sm:flex-row sm:items-end">
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)] sm:flex-row sm:items-end">
             <div className="flex-1">
-              <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="search">
+              <label className="mb-1 block text-xs font-medium text-muted" htmlFor="search">
                 Search customer or product
               </label>
               <input
@@ -112,11 +112,11 @@ export default function InvoicesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="e.g. Acme Corp, or MOUSE"
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="date">
+              <label className="mb-1 block text-xs font-medium text-muted" htmlFor="date">
                 Date
               </label>
               <input
@@ -124,7 +124,7 @@ export default function InvoicesPage() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 sm:w-auto"
+                className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 sm:w-auto"
               />
             </div>
             {(dateFilter || search) && (
@@ -133,84 +133,80 @@ export default function InvoicesPage() {
                   setDateFilter("");
                   setSearch("");
                 }}
-                className="rounded-xl border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
+                className="rounded-lg border border-line px-3 py-2 text-sm text-muted hover:bg-stripe"
               >
                 Clear filters
               </button>
             )}
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-stone-100 bg-white shadow-md">
-            <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
-              <h2 className="text-sm font-semibold text-stone-900">
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="text-sm font-semibold text-ink">
                 {filtered.length} invoice{filtered.length === 1 ? "" : "s"}
               </h2>
-              <p className="text-sm text-stone-500">
+              <p className="text-sm text-muted">
                 Total: {currency}
                 {filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
 
             {filtered.length === 0 ? (
-              <p className="px-5 py-8 text-center text-sm text-stone-500">
+              <p className="px-5 py-8 text-center text-sm text-muted">
                 {invoices.length === 0 ? "No invoices yet." : "No invoices match these filters."}
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-stone-100 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
-                      <th className="whitespace-nowrap px-5 py-3">Invoice</th>
-                      <th className="whitespace-nowrap px-5 py-3">Date</th>
-                      <th className="whitespace-nowrap px-5 py-3">Customer</th>
-                      <th className="px-5 py-3">Items</th>
-                      <th className="whitespace-nowrap px-5 py-3">Total</th>
-                      <th className="whitespace-nowrap px-5 py-3">Payment</th>
-                      <th className="whitespace-nowrap px-5 py-3" />
+                    <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                      <Th>Invoice</Th>
+                      <Th>Date</Th>
+                      <Th>Customer</Th>
+                      <Th>Items</Th>
+                      <Th align="right">Total</Th>
+                      <Th>Payment</Th>
+                      <Th />
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((inv) => {
+                    {filtered.map((inv, i) => {
                       const voided = inv.status === "voided";
                       return (
                         <tr
                           key={inv.id}
-                          className={`border-b border-stone-50 last:border-0 ${voided ? "opacity-50" : ""}`}
+                          className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft ${voided ? "opacity-50" : ""}`}
                         >
-                          <td className="whitespace-nowrap px-5 py-3 font-medium text-stone-900">
+                          <Td className="font-medium text-ink">
                             <span className={voided ? "line-through" : ""}>{invoiceNumberFor(inv.id)}</span>
                             {voided && (
-                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
                                 ⊘ Voided
                               </span>
                             )}
-                          </td>
-                          <td className="whitespace-nowrap px-5 py-3 text-stone-600">
+                          </Td>
+                          <Td className="text-muted">
                             {new Date(inv.createdAt).toLocaleDateString(undefined, {
                               year: "numeric",
                               month: "short",
                               day: "numeric",
                             })}
-                          </td>
-                          <td className="whitespace-nowrap px-5 py-3 text-stone-600">
-                            {inv.customerName || "Cash / Walk-in"}
-                          </td>
-                          <td className="max-w-xs px-5 py-3 text-stone-600">{inv.itemsLabel}</td>
-                          <td className="whitespace-nowrap px-5 py-3 text-stone-900">
+                          </Td>
+                          <Td className="text-muted">{inv.customerName || "Cash / Walk-in"}</Td>
+                          <Td className="max-w-xs whitespace-normal text-muted">{inv.itemsLabel}</Td>
+                          <Td align="right" className="text-ink">
                             {currency}
                             {inv.total.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
-                          </td>
-                          <td className="whitespace-nowrap px-5 py-3">
-                            {!voided && <PaymentPill status={inv.paymentStatus} />}
-                          </td>
-                          <td className="whitespace-nowrap px-5 py-3">
-                            <Link href={`/invoices/${inv.id}`} className="font-medium text-teal-600 hover:underline">
+                          </Td>
+                          <Td>{!voided && <PaymentPill status={inv.paymentStatus} />}</Td>
+                          <Td>
+                            <Link href={`/invoices/${inv.id}`} className="font-medium text-accent hover:underline">
                               View / Print
                             </Link>
-                          </td>
+                          </Td>
                         </tr>
                       );
                     })}
@@ -225,23 +221,51 @@ export default function InvoicesPage() {
   );
 }
 
+function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
+  return (
+    <th className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children,
+  align = "left",
+  className = "",
+}: {
+  children?: React.ReactNode;
+  align?: "left" | "right";
+  className?: string;
+}) {
+  return (
+    <td
+      className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${
+        align === "right" ? "text-right" : "text-left"
+      } ${className}`}
+    >
+      {children}
+    </td>
+  );
+}
+
 function PaymentPill({ status }: { status: PaymentStatus }) {
   if (status === "paid") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
         ✓ Paid
       </span>
     );
   }
   if (status === "partial") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+      <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn">
         ◐ Partial
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+    <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
       ! Unpaid
     </span>
   );

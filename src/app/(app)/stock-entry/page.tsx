@@ -220,34 +220,34 @@ export default function StockEntryPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Inventory</p>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Stock Entry</h1>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-accent">Inventory</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Stock Entry</h1>
+        <p className="mt-1 text-sm text-muted">
           Add or remove stock, edit a product&apos;s price/GST rate, or register a new product.
         </p>
       </header>
 
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-muted">Loading…</p>
       ) : loadError ? (
-        <p className="text-sm text-red-600">{loadError}</p>
+        <p className="text-sm text-err">{loadError}</p>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md">
-            <h2 className="mb-4 text-sm font-semibold text-stone-900">➕ Add stock</h2>
+          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <h2 className="mb-4 text-sm font-semibold text-ink">➕ Add stock</h2>
             {products.length === 0 ? (
-              <p className="text-sm text-stone-500">No products yet — add one first.</p>
+              <p className="text-sm text-muted">No products yet — add one first.</p>
             ) : (
               <form onSubmit={handleRestock} className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="restock-product">
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="restock-product">
                     Product
                   </label>
                   <select
                     id="restock-product"
                     value={restockProduct}
                     onChange={(e) => setRestockProduct(e.target.value)}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
@@ -258,7 +258,7 @@ export default function StockEntryPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="restock-qty">
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="restock-qty">
                     Quantity to add
                   </label>
                   <input
@@ -267,10 +267,10 @@ export default function StockEntryPage() {
                     min={1}
                     value={restockQty}
                     onChange={(e) => setRestockQty(Number(e.target.value))}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                   />
                   {restockCurrent && (
-                    <p className="mt-1 text-xs text-stone-500">
+                    <p className="mt-1 text-xs text-muted">
                       New stock will be {restockCurrent.stock + (restockQty > 0 ? restockQty : 0)}
                     </p>
                   )}
@@ -279,7 +279,7 @@ export default function StockEntryPage() {
                 <button
                   type="submit"
                   disabled={restockSubmitting || !restockProduct || restockQty < 1}
-                  className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
+                  className="rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
                 >
                   {restockSubmitting ? "Adding…" : "Add stock"}
                 </button>
@@ -289,7 +289,7 @@ export default function StockEntryPage() {
             {restockMessage && (
               <p
                 className={`mt-4 text-sm ${
-                  restockMessage.type === "ok" ? "text-emerald-600" : "text-red-600"
+                  restockMessage.type === "ok" ? "text-ok" : "text-err"
                 }`}
               >
                 {restockMessage.text}
@@ -297,24 +297,24 @@ export default function StockEntryPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md">
-            <h2 className="mb-4 text-sm font-semibold text-stone-900">➖ Remove stock</h2>
-            <p className="mb-4 -mt-2 text-xs text-stone-500">
+          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <h2 className="mb-4 text-sm font-semibold text-ink">➖ Remove stock</h2>
+            <p className="mb-4 -mt-2 text-xs text-muted">
               For correcting a physical stock count mismatch — not a sale.
             </p>
             {products.length === 0 ? (
-              <p className="text-sm text-stone-500">No products yet — add one first.</p>
+              <p className="text-sm text-muted">No products yet — add one first.</p>
             ) : (
               <form onSubmit={handleRemoveStock} className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="remove-product">
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="remove-product">
                     Product
                   </label>
                   <select
                     id="remove-product"
                     value={removeProduct}
                     onChange={(e) => setRemoveProduct(e.target.value)}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
@@ -325,7 +325,7 @@ export default function StockEntryPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="remove-qty">
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="remove-qty">
                     Quantity to remove
                   </label>
                   <input
@@ -335,16 +335,16 @@ export default function StockEntryPage() {
                     max={removeCurrent?.stock || undefined}
                     value={removeQty}
                     onChange={(e) => setRemoveQty(Number(e.target.value))}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                   />
                   {removeCurrent && (
-                    <p className="mt-1 text-xs text-stone-500">{removeCurrent.stock} currently in stock</p>
+                    <p className="mt-1 text-xs text-muted">{removeCurrent.stock} currently in stock</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="remove-remarks">
-                    Remarks <span className="text-stone-400">(required)</span>
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="remove-remarks">
+                    Remarks <span className="text-muted">(required)</span>
                   </label>
                   <input
                     id="remove-remarks"
@@ -352,7 +352,7 @@ export default function StockEntryPage() {
                     value={removeRemarks}
                     onChange={(e) => setRemoveRemarks(e.target.value)}
                     placeholder="e.g. damaged in transit, recount correction"
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
 
@@ -365,7 +365,7 @@ export default function StockEntryPage() {
                     removeQty > (removeCurrent?.stock ?? 0) ||
                     !removeRemarks.trim()
                   }
-                  className="rounded-xl bg-red-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-800 disabled:opacity-50"
+                  className="rounded-lg bg-err px-3 py-2 text-sm font-medium text-white transition hover:bg-err/85 disabled:opacity-50"
                 >
                   {removeSubmitting ? "Removing…" : "Remove stock"}
                 </button>
@@ -375,7 +375,7 @@ export default function StockEntryPage() {
             {removeMessage && (
               <p
                 className={`mt-4 text-sm ${
-                  removeMessage.type === "ok" ? "text-emerald-600" : "text-red-600"
+                  removeMessage.type === "ok" ? "text-ok" : "text-err"
                 }`}
               >
                 {removeMessage.text}
@@ -383,22 +383,22 @@ export default function StockEntryPage() {
             )}
           </section>
 
-          <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md">
-            <h2 className="mb-4 text-sm font-semibold text-stone-900">✏️ Edit product</h2>
-            <p className="mb-4 -mt-2 text-xs text-stone-500">Update an existing product&apos;s price or GST rate.</p>
+          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <h2 className="mb-4 text-sm font-semibold text-ink">✏️ Edit product</h2>
+            <p className="mb-4 -mt-2 text-xs text-muted">Update an existing product&apos;s price or GST rate.</p>
             {products.length === 0 ? (
-              <p className="text-sm text-stone-500">No products yet — add one first.</p>
+              <p className="text-sm text-muted">No products yet — add one first.</p>
             ) : (
               <form onSubmit={handleEditProduct} className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="edit-product">
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="edit-product">
                     Product
                   </label>
                   <select
                     id="edit-product"
                     value={editProduct}
                     onChange={(e) => setEditProduct(e.target.value)}
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
@@ -410,7 +410,7 @@ export default function StockEntryPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="edit-cost">
+                    <label className="mb-1 block text-xs font-medium text-muted" htmlFor="edit-cost">
                       Cost
                     </label>
                     <input
@@ -419,18 +419,18 @@ export default function StockEntryPage() {
                       min={0}
                       value={editCost}
                       onChange={(e) => setEditCost(e.target.value === "" ? "" : Number(e.target.value))}
-                      className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                      className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="edit-gst">
+                    <label className="mb-1 block text-xs font-medium text-muted" htmlFor="edit-gst">
                       GST rate
                     </label>
                     <select
                       id="edit-gst"
                       value={editGstRate}
                       onChange={(e) => setEditGstRate(Number(e.target.value))}
-                      className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                      className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                     >
                       {GST_RATES.map((rate) => (
                         <option key={rate} value={rate}>
@@ -444,7 +444,7 @@ export default function StockEntryPage() {
                 <button
                   type="submit"
                   disabled={editSubmitting || !editProduct || editCost === ""}
-                  className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
+                  className="rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
                 >
                   {editSubmitting ? "Saving…" : "Save changes"}
                 </button>
@@ -452,17 +452,17 @@ export default function StockEntryPage() {
             )}
 
             {editMessage && (
-              <p className={`mt-4 text-sm ${editMessage.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
+              <p className={`mt-4 text-sm ${editMessage.type === "ok" ? "text-ok" : "text-err"}`}>
                 {editMessage.text}
               </p>
             )}
           </section>
 
-          <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md lg:col-span-2">
-            <h2 className="mb-4 text-sm font-semibold text-stone-900">🆕 Add new product</h2>
+          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)] lg:col-span-2">
+            <h2 className="mb-4 text-sm font-semibold text-ink">🆕 Add new product</h2>
             <form onSubmit={handleCreateProduct} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="new-name">
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="new-name">
                   Product name
                 </label>
                 <input
@@ -470,12 +470,12 @@ export default function StockEntryPage() {
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="new-cost">
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="new-cost">
                   Cost
                 </label>
                 <input
@@ -484,11 +484,11 @@ export default function StockEntryPage() {
                   min={0}
                   value={newCost}
                   onChange={(e) => setNewCost(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="new-stock">
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="new-stock">
                   Initial stock
                 </label>
                 <input
@@ -497,19 +497,19 @@ export default function StockEntryPage() {
                   min={0}
                   value={newStock}
                   onChange={(e) => setNewStock(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="new-gst">
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="new-gst">
                   GST rate
                 </label>
                 <select
                   id="new-gst"
                   value={newGstRate}
                   onChange={(e) => setNewGstRate(Number(e.target.value))}
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                 >
                   {GST_RATES.map((rate) => (
                     <option key={rate} value={rate}>
@@ -523,7 +523,7 @@ export default function StockEntryPage() {
                 <button
                   type="submit"
                   disabled={newSubmitting || !newName.trim() || newCost === "" || newStock === ""}
-                  className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
+                  className="rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
                 >
                   {newSubmitting ? "Adding…" : "Add product"}
                 </button>
@@ -533,7 +533,7 @@ export default function StockEntryPage() {
             {newMessage && (
               <p
                 className={`mt-4 text-sm ${
-                  newMessage.type === "ok" ? "text-emerald-600" : "text-red-600"
+                  newMessage.type === "ok" ? "text-ok" : "text-err"
                 }`}
               >
                 {newMessage.text}
@@ -543,31 +543,31 @@ export default function StockEntryPage() {
         </div>
       )}
 
-      <section className="mt-6 rounded-2xl border border-stone-100 bg-white shadow-md">
-        <div className="border-b border-stone-100 px-5 py-4">
-          <h2 className="text-sm font-semibold text-stone-900">📋 Recent stock adjustments</h2>
-          <p className="text-xs text-stone-500">Every manual stock correction, with its remarks.</p>
+      <section className="mt-6 rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="text-sm font-semibold text-ink">📋 Recent stock adjustments</h2>
+          <p className="text-xs text-muted">Every manual stock correction, with its remarks.</p>
         </div>
         {adjustmentsLoading ? (
-          <p className="px-5 py-6 text-sm text-stone-500">Loading…</p>
+          <p className="px-5 py-6 text-sm text-muted">Loading…</p>
         ) : adjustments.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-stone-500">No stock corrections logged yet.</p>
+          <p className="px-5 py-6 text-sm text-muted">No stock corrections logged yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-100 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
-                  <th className="whitespace-nowrap px-5 py-3">Date</th>
-                  <th className="whitespace-nowrap px-5 py-3">Product</th>
-                  <th className="whitespace-nowrap px-5 py-3">Qty removed</th>
-                  <th className="whitespace-nowrap px-5 py-3">New stock</th>
-                  <th className="px-5 py-3">Remarks</th>
+                <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Date</th>
+                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Product</th>
+                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Qty removed</th>
+                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">New stock</th>
+                  <th className="whitespace-nowrap border-b border-border px-5 py-3">Remarks</th>
                 </tr>
               </thead>
               <tbody>
-                {adjustments.map((a) => (
-                  <tr key={a.id} className="border-b border-stone-50 last:border-0">
-                    <td className="whitespace-nowrap px-5 py-3 text-stone-600">
+                {adjustments.map((a, i) => (
+                  <tr key={a.id} className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft`}>
+                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">
                       {new Date(a.createdAt).toLocaleString(undefined, {
                         year: "numeric",
                         month: "short",
@@ -576,15 +576,15 @@ export default function StockEntryPage() {
                         minute: "2-digit",
                       })}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <div className="flex items-center gap-2 font-medium text-stone-900">
+                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3">
+                      <div className="flex items-center gap-2 font-medium text-ink">
                         <ProductAvatar name={a.productName} />
                         {a.productName}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-red-600">-{a.qty}</td>
-                    <td className="whitespace-nowrap px-5 py-3 text-stone-600">{a.newStock}</td>
-                    <td className="px-5 py-3 text-stone-600">{a.remarks}</td>
+                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-err">-{a.qty}</td>
+                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">{a.newStock}</td>
+                    <td className="whitespace-nowrap border-b border-border px-5 py-3 text-muted">{a.remarks}</td>
                   </tr>
                 ))}
               </tbody>
