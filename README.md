@@ -9,21 +9,22 @@ Vercel.
 ## Look and feel
 
 - **Brand identity** — **CounterBook** (renamed from the internal "Stock Warehouse"
-  project name). Visual style is a "Modern SAP Fiori / Horizon" theme: a navy gradient
-  header with a gold accent line, SAP-blue (`#0a6ed1`) primary actions, a light
-  blue-gray workspace background, Poppins for headings/UI text, and dense
+  project name). Visual style is a "Modern SAP Fiori / Horizon" theme: a navy sidebar
+  with a gold accent line, SAP-blue (`#0a6ed1`) primary actions, a light blue-gray
+  workspace background, Poppins for headings/UI text, and dense
   bordered/striped/hover-highlighted tables — closer to the polished, professional feel
   of SAP Business One / Fiori-style ERP consoles than a generic admin-template look.
   All theme colors are CSS custom properties in `src/app/globals.css`, mapped into
   Tailwind v4's `@theme inline` block (`bg-navy`, `text-accent`, `bg-card`,
   `border-line`, `text-ok`/`text-err`/`text-warn`, etc.) so the palette is defined once
   and used as ordinary utility classes everywhere.
-- **Navigation** — a top navy header (product brand + the logged-in company's own logo,
-  or a generated monogram) with a horizontally-scrollable tab bar underneath
-  (`src/components/AppHeader.tsx`) — no sidebar/hamburger drawer; on narrow screens the
-  tabs just scroll instead of collapsing into a menu.
+- **Navigation** — a persistent navy sidebar on desktop (product brand + the logged-in
+  company's own logo, or a generated gold monogram); on narrow screens it becomes a
+  hamburger-triggered off-canvas drawer instead (`src/components/Sidebar.tsx`) — the
+  familiar mobile pattern, so every destination is one clearly-labeled tap away rather
+  than something to discover by scrolling.
 - **Company logo** — upload one on Settings (stored as a data URL on `company_settings`,
-  no separate file storage needed). Shows in the header (with a generated gold
+  no separate file storage needed). Shows in the sidebar (with a generated gold
   monogram as the fallback when there's no logo yet) and on every invoice header.
 - **Product avatars** — every product gets a deterministic colored initial avatar
   (`src/lib/productColor.ts` hashes the name to a fixed palette, independent of the
@@ -70,8 +71,8 @@ Vercel.
   page), `invoices/[id]/void` (POST), `reports` (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
-- `src/app/(app)/` — the app shell: `layout.tsx` renders the header + tab bar
-  (`src/components/AppHeader.tsx`); routes inside it, in tab order:
+- `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
+  (`src/components/Sidebar.tsx`); routes inside it, in nav order:
   - `page.tsx` — **Dashboard**: KPI tiles (products, units in stock, low stock,
     inventory value) and the multi-item order builder (add products to a cart,
     required customer name + address, one invoice on submit). No stock table here —
@@ -82,7 +83,7 @@ Vercel.
     date filter, a customer/product search box, and a payment-status column — find one
     and reprint it. Voided invoices show struck through with a "Voided" badge.
   - `invoices/[id]/page.tsx` — the printable invoice itself (client-rendered, fetches
-    from `/api/invoices/[id]`; the header/tabs and back/print controls are hidden via
+    from `/api/invoices/[id]`; the sidebar and back/print controls are hidden via
     `print:` classes when actually printed — use the Print button, or the browser's own
     print dialog / Ctrl+P). Sets the page title to `Invoice No: INV-000123`, which
     browsers use as the print header and default PDF filename. Below the invoice

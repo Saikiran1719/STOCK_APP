@@ -124,7 +124,7 @@ export default function SettingsPage() {
           onSubmit={handleSubmit}
           className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)] sm:p-6"
         >
-          <Field label="Logo" hint="Shown in the header and on invoices. Under 500KB.">
+          <Field label="Logo" hint="Shown in the sidebar and on invoices. Under 500KB.">
             <div className="flex items-center gap-4">
               {settings.logoDataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
