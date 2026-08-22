@@ -34,7 +34,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen w-full items-center justify-center bg-slate-900 px-4">
       <div className="w-full max-w-sm rounded-lg border border-slate-800 bg-white p-6 shadow-xl sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">
           Inventory Console
         </p>
         <h1 className="mb-1 mt-1 text-xl font-semibold text-slate-900">Stock Warehouse</h1>
@@ -49,13 +49,13 @@ export default function LoginPage() {
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={loading || !password}
-            className="mt-2 rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
+            className="mt-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
           >
             {loading ? "Signing in…" : "Sign in"}
           </button>

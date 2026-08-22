@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import ProductAvatar from "@/components/ProductAvatar";
 
 type Product = { id: number; name: string; cost: number; stock: number; gstRate: number };
 type CartItem = { name: string; qty: number };
@@ -145,19 +146,24 @@ export default function DashboardPage() {
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KpiTile label="Products" value={totalProducts} />
-            <KpiTile label="Units in stock" value={totalUnits} />
+            <KpiTile icon="📦" label="Products" value={totalProducts} />
+            <KpiTile icon="📊" label="Units in stock" value={totalUnits} />
             <KpiTile
+              icon="⚠️"
               label="Low stock"
               value={lowStockCount}
               tone={lowStockCount > 0 ? "warn" : "default"}
             />
-            <KpiTile label="Inventory value" value={`${currency}${inventoryValue.toLocaleString()}`} />
+            <KpiTile
+              icon="💰"
+              label="Inventory value"
+              value={`${currency}${inventoryValue.toLocaleString()}`}
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
             <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
-              <h2 className="mb-4 text-sm font-semibold text-slate-900">Place order</h2>
+              <h2 className="mb-4 text-sm font-semibold text-slate-900">🛒 Place order</h2>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="customer">
@@ -169,7 +175,7 @@ export default function DashboardPage() {
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     placeholder="Shown on the invoice"
                   />
                 </div>
@@ -184,7 +190,7 @@ export default function DashboardPage() {
                     value={customerAddress}
                     onChange={(e) => setCustomerAddress(e.target.value)}
                     rows={2}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     placeholder="Billing address, shown on the invoice"
                   />
                 </div>
@@ -198,7 +204,7 @@ export default function DashboardPage() {
                         setPickProduct(e.target.value);
                         setPickQty(1);
                       }}
-                      className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                      className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     >
                       {products.map((p) => (
                         <option key={p.name} value={p.name} disabled={remainingStock(p.name) <= 0}>
@@ -212,13 +218,13 @@ export default function DashboardPage() {
                       max={pickAvailable || undefined}
                       value={pickQty}
                       onChange={(e) => setPickQty(Number(e.target.value))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 sm:w-20"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 sm:w-20"
                     />
                     <button
                       type="button"
                       onClick={addItem}
                       disabled={!pickProduct || pickQty < 1 || pickQty > pickAvailable}
-                      className="rounded border border-blue-700 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-50"
+                      className="rounded border border-indigo-600 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
                     >
                       Add item
                     </button>
@@ -234,14 +240,17 @@ export default function DashboardPage() {
                           key={i}
                           className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-0"
                         >
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-900">
-                              {item.name} × {item.qty}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {currency}
-                              {line.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                            </p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <ProductAvatar name={item.name} />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-slate-900">
+                                {item.name} × {item.qty}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {currency}
+                                {line.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
                           </div>
                           <button
                             type="button"
@@ -267,7 +276,7 @@ export default function DashboardPage() {
                 <button
                   type="submit"
                   disabled={submitting || !canSubmit}
-                  className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
+                  className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {submitting ? "Placing order…" : "Place order"}
                 </button>
@@ -282,7 +291,7 @@ export default function DashboardPage() {
 
             <section className="rounded-lg border border-gray-200 bg-white shadow-sm lg:col-span-3">
               <div className="border-b border-gray-100 px-5 py-4">
-                <h2 className="text-sm font-semibold text-slate-900">Stock</h2>
+                <h2 className="text-sm font-semibold text-slate-900">📦 Stock</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -298,7 +307,12 @@ export default function DashboardPage() {
                   <tbody>
                     {products.map((p) => (
                       <tr key={p.name} className="border-b border-gray-50 last:border-0">
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">{p.name}</td>
+                        <td className="whitespace-nowrap px-5 py-3">
+                          <div className="flex items-center gap-2 font-medium text-slate-900">
+                            <ProductAvatar name={p.name} />
+                            {p.name}
+                          </div>
+                        </td>
                         <td className="whitespace-nowrap px-5 py-3 text-slate-600">
                           {currency}
                           {p.cost.toLocaleString()}
@@ -322,20 +336,27 @@ export default function DashboardPage() {
 }
 
 function KpiTile({
+  icon,
   label,
   value,
   tone = "default",
 }: {
+  icon: string;
   label: string;
   value: string | number;
   tone?: "default" | "warn";
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${tone === "warn" ? "text-amber-600" : "text-slate-900"}`}>
-        {value}
-      </p>
+    <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+      <span className="text-xl leading-none" aria-hidden>
+        {icon}
+      </span>
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <p className={`mt-1 text-2xl font-semibold ${tone === "warn" ? "text-amber-600" : "text-slate-900"}`}>
+          {value}
+        </p>
+      </div>
     </div>
   );
 }
@@ -343,21 +364,21 @@ function KpiTile({
 function StatusPill({ stock }: { stock: number }) {
   if (stock <= 0) {
     return (
-      <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-        Out of stock
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+        ✕ Out of stock
       </span>
     );
   }
   if (stock <= LOW_STOCK_THRESHOLD) {
     return (
-      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-        Low stock
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+        ⚠ Low stock
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-      In stock
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+      ✓ In stock
     </span>
   );
 }

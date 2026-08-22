@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import ProductAvatar from "@/components/ProductAvatar";
 
 type Product = { id: number; name: string; cost: number; stock: number; gstRate: number };
 type Message = { type: "ok" | "error"; text: string };
@@ -232,7 +233,7 @@ export default function StockEntryPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Add stock</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">➕ Add stock</h2>
             {products.length === 0 ? (
               <p className="text-sm text-slate-500">No products yet — add one first.</p>
             ) : (
@@ -245,7 +246,7 @@ export default function StockEntryPage() {
                     id="restock-product"
                     value={restockProduct}
                     onChange={(e) => setRestockProduct(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
@@ -265,7 +266,7 @@ export default function StockEntryPage() {
                     min={1}
                     value={restockQty}
                     onChange={(e) => setRestockQty(Number(e.target.value))}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   />
                   {restockCurrent && (
                     <p className="mt-1 text-xs text-slate-500">
@@ -277,7 +278,7 @@ export default function StockEntryPage() {
                 <button
                   type="submit"
                   disabled={restockSubmitting || !restockProduct || restockQty < 1}
-                  className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
+                  className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {restockSubmitting ? "Adding…" : "Add stock"}
                 </button>
@@ -296,7 +297,7 @@ export default function StockEntryPage() {
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Remove stock</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">➖ Remove stock</h2>
             <p className="mb-4 -mt-2 text-xs text-slate-500">
               For correcting a physical stock count mismatch — not a sale.
             </p>
@@ -312,7 +313,7 @@ export default function StockEntryPage() {
                     id="remove-product"
                     value={removeProduct}
                     onChange={(e) => setRemoveProduct(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
@@ -333,7 +334,7 @@ export default function StockEntryPage() {
                     max={removeCurrent?.stock || undefined}
                     value={removeQty}
                     onChange={(e) => setRemoveQty(Number(e.target.value))}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   />
                   {removeCurrent && (
                     <p className="mt-1 text-xs text-slate-500">{removeCurrent.stock} currently in stock</p>
@@ -350,7 +351,7 @@ export default function StockEntryPage() {
                     value={removeRemarks}
                     onChange={(e) => setRemoveRemarks(e.target.value)}
                     placeholder="e.g. damaged in transit, recount correction"
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   />
                 </div>
 
@@ -382,7 +383,7 @@ export default function StockEntryPage() {
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Edit product</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">✏️ Edit product</h2>
             <p className="mb-4 -mt-2 text-xs text-slate-500">Update an existing product&apos;s price or GST rate.</p>
             {products.length === 0 ? (
               <p className="text-sm text-slate-500">No products yet — add one first.</p>
@@ -396,7 +397,7 @@ export default function StockEntryPage() {
                     id="edit-product"
                     value={editProduct}
                     onChange={(e) => setEditProduct(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
@@ -417,7 +418,7 @@ export default function StockEntryPage() {
                       min={0}
                       value={editCost}
                       onChange={(e) => setEditCost(e.target.value === "" ? "" : Number(e.target.value))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div>
@@ -428,7 +429,7 @@ export default function StockEntryPage() {
                       id="edit-gst"
                       value={editGstRate}
                       onChange={(e) => setEditGstRate(Number(e.target.value))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                     >
                       {GST_RATES.map((rate) => (
                         <option key={rate} value={rate}>
@@ -442,7 +443,7 @@ export default function StockEntryPage() {
                 <button
                   type="submit"
                   disabled={editSubmitting || !editProduct || editCost === ""}
-                  className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
+                  className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {editSubmitting ? "Saving…" : "Save changes"}
                 </button>
@@ -457,7 +458,7 @@ export default function StockEntryPage() {
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Add new product</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">🆕 Add new product</h2>
             <form onSubmit={handleCreateProduct} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="new-name">
@@ -468,7 +469,7 @@ export default function StockEntryPage() {
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -482,7 +483,7 @@ export default function StockEntryPage() {
                   min={0}
                   value={newCost}
                   onChange={(e) => setNewCost(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
               </div>
               <div>
@@ -495,7 +496,7 @@ export default function StockEntryPage() {
                   min={0}
                   value={newStock}
                   onChange={(e) => setNewStock(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
               </div>
 
@@ -507,7 +508,7 @@ export default function StockEntryPage() {
                   id="new-gst"
                   value={newGstRate}
                   onChange={(e) => setNewGstRate(Number(e.target.value))}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 >
                   {GST_RATES.map((rate) => (
                     <option key={rate} value={rate}>
@@ -521,7 +522,7 @@ export default function StockEntryPage() {
                 <button
                   type="submit"
                   disabled={newSubmitting || !newName.trim() || newCost === "" || newStock === ""}
-                  className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
+                  className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {newSubmitting ? "Adding…" : "Add product"}
                 </button>
@@ -543,7 +544,7 @@ export default function StockEntryPage() {
 
       <section className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-5 py-4">
-          <h2 className="text-sm font-semibold text-slate-900">Recent stock adjustments</h2>
+          <h2 className="text-sm font-semibold text-slate-900">📋 Recent stock adjustments</h2>
           <p className="text-xs text-slate-500">Every manual stock correction, with its remarks.</p>
         </div>
         {adjustmentsLoading ? (
@@ -574,7 +575,12 @@ export default function StockEntryPage() {
                         minute: "2-digit",
                       })}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">{a.productName}</td>
+                    <td className="whitespace-nowrap px-5 py-3">
+                      <div className="flex items-center gap-2 font-medium text-slate-900">
+                        <ProductAvatar name={a.productName} />
+                        {a.productName}
+                      </div>
+                    </td>
                     <td className="whitespace-nowrap px-5 py-3 text-red-600">-{a.qty}</td>
                     <td className="whitespace-nowrap px-5 py-3 text-slate-600">{a.newStock}</td>
                     <td className="px-5 py-3 text-slate-600">{a.remarks}</td>

@@ -111,7 +111,7 @@ export default function InvoicesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="e.g. Acme Corp, or MOUSE"
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               />
             </div>
             <div>
@@ -123,7 +123,7 @@ export default function InvoicesPage() {
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 sm:w-auto"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 sm:w-auto"
               />
             </div>
             {(dateFilter || search) && (
@@ -179,8 +179,8 @@ export default function InvoicesPage() {
                           <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">
                             <span className={voided ? "line-through" : ""}>{invoiceNumberFor(inv.id)}</span>
                             {voided && (
-                              <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                                Voided
+                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                                ⊘ Voided
                               </span>
                             )}
                           </td>
@@ -206,7 +206,7 @@ export default function InvoicesPage() {
                             {!voided && <PaymentPill status={inv.paymentStatus} />}
                           </td>
                           <td className="whitespace-nowrap px-5 py-3">
-                            <Link href={`/invoices/${inv.id}`} className="font-medium text-blue-700 hover:underline">
+                            <Link href={`/invoices/${inv.id}`} className="font-medium text-indigo-600 hover:underline">
                               View / Print
                             </Link>
                           </td>
@@ -227,21 +227,21 @@ export default function InvoicesPage() {
 function PaymentPill({ status }: { status: PaymentStatus }) {
   if (status === "paid") {
     return (
-      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-        Paid
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        ✓ Paid
       </span>
     );
   }
   if (status === "partial") {
     return (
-      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-        Partial
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+        ◐ Partial
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-      Unpaid
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+      ! Unpaid
     </span>
   );
 }

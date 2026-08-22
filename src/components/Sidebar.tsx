@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: "▦" },
@@ -15,6 +15,20 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [logoDataUrl, setLogoDataUrl] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.settings) {
+          setCompanyName(data.settings.companyName || "");
+          setLogoDataUrl(data.settings.logoDataUrl || "");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleLogout() {
     await fetch("/api/logout", { method: "POST" });
@@ -32,7 +46,10 @@ export default function Sidebar() {
         >
           ☰
         </button>
-        <p className="text-sm font-semibold tracking-wide">STOCK WAREHOUSE</p>
+        <div className="flex items-center gap-2">
+          <Brand companyName={companyName} logoDataUrl={logoDataUrl} compact />
+          <p className="text-sm font-semibold tracking-wide">STOCK WAREHOUSE</p>
+        </div>
         <span className="w-7" aria-hidden />
       </div>
 
@@ -50,10 +67,15 @@ export default function Sidebar() {
           open ? "translate-x-0" : ""
         }`}
       >
+        <div className="h-1 shrink-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500" />
+
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-5">
-          <div>
-            <p className="text-sm font-semibold tracking-wide text-white">STOCK WAREHOUSE</p>
-            <p className="text-xs text-slate-500">Inventory Console</p>
+          <div className="flex items-center gap-3">
+            <Brand companyName={companyName} logoDataUrl={logoDataUrl} />
+            <div>
+              <p className="text-sm font-semibold tracking-wide text-white">STOCK WAREHOUSE</p>
+              <p className="text-xs text-slate-500">{companyName || "Inventory Console"}</p>
+            </div>
           </div>
           <button
             onClick={() => setOpen(false)}
@@ -75,7 +97,7 @@ export default function Sidebar() {
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
                   active
-                    ? "border-l-2 border-blue-500 bg-slate-800 text-white"
+                    ? "border-l-2 border-indigo-400 bg-indigo-500/15 text-white"
                     : "border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
                 }`}
               >
@@ -96,5 +118,30 @@ export default function Sidebar() {
         </div>
       </aside>
     </>
+  );
+}
+
+function Brand({
+  companyName,
+  logoDataUrl,
+  compact = false,
+}: {
+  companyName: string;
+  logoDataUrl: string;
+  compact?: boolean;
+}) {
+  const dims = compact ? "h-6 w-6 text-xs" : "h-9 w-9 text-sm";
+  if (logoDataUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={logoDataUrl} alt="Company logo" className={`${dims} shrink-0 rounded object-contain`} />;
+  }
+  const initial = companyName.trim().charAt(0).toUpperCase() || "S";
+  return (
+    <span
+      className={`flex ${dims} shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 font-bold text-white`}
+      aria-hidden
+    >
+      {initial}
+    </span>
   );
 }

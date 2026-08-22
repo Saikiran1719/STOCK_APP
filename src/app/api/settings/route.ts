@@ -27,10 +27,14 @@ export async function PUT(request: NextRequest) {
     gstin: typeof body.gstin === "string" ? body.gstin : "",
     currencySymbol: typeof body.currencySymbol === "string" ? body.currencySymbol : "",
     invoiceNote: typeof body.invoiceNote === "string" ? body.invoiceNote : "",
+    logoDataUrl: typeof body.logoDataUrl === "string" ? body.logoDataUrl : "",
   };
 
   try {
-    await saveSettings(settings);
+    const result = await saveSettings(settings);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
     return NextResponse.json({ ok: true, settings });
   } catch (err) {
     console.error(err);

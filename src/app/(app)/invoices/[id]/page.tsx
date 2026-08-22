@@ -41,6 +41,7 @@ type Settings = {
   gstin: string;
   currencySymbol: string;
   invoiceNote: string;
+  logoDataUrl: string;
 };
 
 function invoiceNumberFor(id: number) {
@@ -194,19 +195,29 @@ export default function InvoicePage() {
       <div className="border-2 border-slate-900 bg-white text-slate-900 print:border-2">
         {/* Header */}
         <div className="flex flex-col gap-4 border-b-2 border-slate-900 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
-          <div>
-            <h1 className="text-lg font-bold uppercase tracking-wide">
-              {settings.companyName || "Your Company Name"}
-            </h1>
-            {settings.address && (
-              <p className="whitespace-pre-line text-sm text-slate-700">{settings.address}</p>
+          <div className="flex items-start gap-3">
+            {settings.logoDataUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={settings.logoDataUrl}
+                alt={`${settings.companyName || "Company"} logo`}
+                className="h-12 w-12 shrink-0 rounded object-contain"
+              />
             )}
-            {(settings.phone || settings.email) && (
-              <p className="text-sm text-slate-700">
-                {[settings.phone && `Ph: ${settings.phone}`, settings.email].filter(Boolean).join("  |  ")}
-              </p>
-            )}
-            {settings.gstin && <p className="text-sm font-medium text-slate-700">GSTIN: {settings.gstin}</p>}
+            <div>
+              <h1 className="text-lg font-bold uppercase tracking-wide">
+                {settings.companyName || "Your Company Name"}
+              </h1>
+              {settings.address && (
+                <p className="whitespace-pre-line text-sm text-slate-700">{settings.address}</p>
+              )}
+              {(settings.phone || settings.email) && (
+                <p className="text-sm text-slate-700">
+                  {[settings.phone && `Ph: ${settings.phone}`, settings.email].filter(Boolean).join("  |  ")}
+                </p>
+              )}
+              {settings.gstin && <p className="text-sm font-medium text-slate-700">GSTIN: {settings.gstin}</p>}
+            </div>
           </div>
           <div className="shrink-0 sm:text-right">
             <p className="text-2xl font-bold uppercase tracking-widest">Tax Invoice</p>
@@ -309,7 +320,7 @@ export default function InvoicePage() {
       {invoice.status === "active" && (
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 print:hidden">
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Record payment</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">💳 Record payment</h2>
             <form onSubmit={handleRecordPayment} className="flex flex-col gap-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="amount-paid">
@@ -322,7 +333,7 @@ export default function InvoicePage() {
                   max={invoice.total}
                   value={amountPaidInput}
                   onChange={(e) => setAmountPaidInput(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
                 />
                 <p className="mt-1 text-xs text-slate-500">
                   Total {money(invoice.total)} — balance due{" "}
@@ -332,7 +343,7 @@ export default function InvoicePage() {
               <button
                 type="submit"
                 disabled={paySubmitting || amountPaidInput === ""}
-                className="self-start rounded bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
+                className="self-start rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
               >
                 {paySubmitting ? "Saving…" : "Save payment"}
               </button>
@@ -341,7 +352,7 @@ export default function InvoicePage() {
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-1 text-sm font-semibold text-slate-900">Void this invoice</h2>
+            <h2 className="mb-1 text-sm font-semibold text-slate-900">🚫 Void this invoice</h2>
             <p className="mb-4 text-xs text-slate-500">
               Restores stock for every item on this invoice. Cannot be undone.
             </p>
@@ -397,21 +408,21 @@ export default function InvoicePage() {
 function PaymentPill({ status }: { status: PaymentStatus }) {
   if (status === "paid") {
     return (
-      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-        Paid
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        ✓ Paid
       </span>
     );
   }
   if (status === "partial") {
     return (
-      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-        Partial
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+        ◐ Partial
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-      Unpaid
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+      ! Unpaid
     </span>
   );
 }

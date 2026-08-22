@@ -86,7 +86,7 @@ export default function ReportsPage() {
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
           />
         </div>
       </header>
@@ -112,7 +112,7 @@ export default function ReportsPage() {
 
           <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-900">GST breakdown by rate</h2>
+              <h2 className="text-sm font-semibold text-slate-900">🧮 GST breakdown by rate</h2>
               <p className="text-xs text-slate-500">Useful for filing returns per slab.</p>
             </div>
             {summary.byGstRate.length === 0 ? (

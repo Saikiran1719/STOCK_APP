@@ -6,6 +6,21 @@ invoice ever placed, run monthly GST/sales reports, and manage stock/products/GS
 from a dedicated screen — all backed by Supabase (Postgres). Password-gated, deployed on
 Vercel.
 
+## Look and feel
+
+- **Company logo** — upload one on Settings (stored as a data URL on `company_settings`,
+  no separate file storage needed). Shows in the sidebar (with a generated colored
+  monogram as the fallback when there's no logo yet) and on every invoice header.
+- **Product avatars** — every product gets a deterministic colored initial avatar
+  (`src/lib/productColor.ts` hashes the name to a fixed palette), so the same product
+  reads as the same color everywhere — stock tables, the order cart, stock adjustment
+  history.
+- **Status at a glance** — stock/payment/void indicators are icon-prefixed pills
+  (✓ In stock, ⚠ Low stock, ✕ Out of stock, ✓ Paid, ◐ Partial, ! Unpaid, ⊘ Voided) rather
+  than plain colored text, and card headers carry a small icon each.
+- Accent color is indigo/violet throughout (buttons, focus rings, active nav, the
+  sidebar's top gradient bar) — swapped from the earlier plain blue.
+
 ## How it works
 
 - `src/lib/db.ts` — talks to Supabase via `@supabase/supabase-js` using the service-role
@@ -35,7 +50,7 @@ Vercel.
     sales, GST collected, amount received/outstanding, and a breakdown by GST rate slab
     — the numbers a monthly GST return needs.
   - `getSettings()` / `saveSettings()` read/write the single-row `company_settings`
-    table (company name, address, GSTIN, currency symbol, invoice footer note).
+    table (company name, address, GSTIN, currency symbol, invoice footer note, logo).
 - `src/app/api/*` — route handlers: `login`, `logout`, `products` (GET list + POST
   create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
   remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice),

@@ -247,6 +247,11 @@ alter table invoices add column if not exists status text not null default 'acti
 alter table invoices add column if not exists voided_at timestamptz;
 alter table invoices add column if not exists void_reason text;
 
+-- Company logo, stored as a data URL (small enough that a dedicated
+-- storage bucket isn't worth the setup) — shown in the sidebar and on
+-- printed invoices.
+alter table company_settings add column if not exists logo_data_url text;
+
 -- Atomically restores stock for every line item and marks the invoice
 -- voided, in one transaction — a partial restore can't happen.
 create or replace function void_invoice(p_invoice_id bigint, p_reason text)

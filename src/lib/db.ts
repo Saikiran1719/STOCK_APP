@@ -19,6 +19,7 @@ export type Settings = {
   gstin: string;
   currencySymbol: string;
   invoiceNote: string;
+  logoDataUrl: string;
 };
 
 export type InvoiceItemInput = { name: string; qty: number };
@@ -117,7 +118,11 @@ const DEFAULT_SETTINGS: Settings = {
   gstin: "",
   currencySymbol: "",
   invoiceNote: "Thank you for your business.",
+  logoDataUrl: "",
 };
+
+/** Hard cap on the stored logo — keeps a single settings row reasonable in size. */
+export const MAX_LOGO_DATA_URL_LENGTH = 700_000; // ~500KB image, base64-inflated
 
 function isValidGstRate(rate: number): boolean {
   return (GST_RATES as readonly number[]).includes(rate);
@@ -887,7 +892,7 @@ export async function getSettings(): Promise<Settings> {
 
   const { data, error } = await getClient()
     .from("company_settings")
-    .select("company_name, address, phone, email, gstin, currency_symbol, invoice_note")
+    .select("company_name, address, phone, email, gstin, currency_symbol, invoice_note, logo_data_url")
     .eq("id", 1)
     .maybeSingle();
 
@@ -902,13 +907,18 @@ export async function getSettings(): Promise<Settings> {
     gstin: data.gstin ?? "",
     currencySymbol: data.currency_symbol ?? "",
     invoiceNote: data.invoice_note ?? "",
+    logoDataUrl: data.logo_data_url ?? "",
   };
 }
 
-export async function saveSettings(settings: Settings): Promise<void> {
+export async function saveSettings(settings: Settings): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (settings.logoDataUrl && settings.logoDataUrl.length > MAX_LOGO_DATA_URL_LENGTH) {
+    return { ok: false, error: "Logo image is too large. Please use a smaller image (under ~500KB)." };
+  }
+
   if (isDemoMode()) {
     demoSettings = { ...settings };
-    return;
+    return { ok: true };
   }
 
   const { error } = await getClient()
@@ -921,9 +931,11 @@ export async function saveSettings(settings: Settings): Promise<void> {
       email: settings.email,
       gstin: settings.gstin,
       currency_symbol: settings.currencySymbol,
+      logo_data_url: settings.logoDataUrl || null,
       invoice_note: settings.invoiceNote,
       updated_at: new Date().toISOString(),
     });
 
   if (error) throw error;
+  return { ok: true };
 }
