@@ -137,11 +137,13 @@ create index if not exists invoice_items_invoice_id_idx on invoice_items(invoice
 -- exception aborts the whole function and every change it made this call
 -- is rolled back, so a multi-item order can never partially succeed.
 --
--- Signature changed (added p_customer_address) — DROP first since CREATE
--- OR REPLACE can't add a parameter to an existing function.
+-- One-time cleanup for anyone who ran an earlier version of this file with
+-- the old 2-argument signature — CREATE OR REPLACE can't add a parameter to
+-- an existing function, so that old version has to be dropped explicitly.
+-- A no-op once it's already gone.
 drop function if exists place_invoice(text, jsonb);
 
-create function place_invoice(p_customer_name text, p_customer_address text, p_items jsonb)
+create or replace function place_invoice(p_customer_name text, p_customer_address text, p_items jsonb)
 returns table (invoice_id bigint, invoice_total numeric)
 language plpgsql
 as $$
