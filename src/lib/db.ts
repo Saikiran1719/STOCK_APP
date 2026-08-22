@@ -35,7 +35,8 @@ export type InvoiceItem = {
 
 export type InvoiceSummary = {
   id: number;
-  customerName: string | null;
+  customerName: string;
+  customerAddress: string;
   itemsLabel: string;
   subtotal: number;
   gstAmount: number;
@@ -45,7 +46,8 @@ export type InvoiceSummary = {
 
 export type InvoiceDetail = {
   id: number;
-  customerName: string | null;
+  customerName: string;
+  customerAddress: string;
   subtotal: number;
   gstAmount: number;
   total: number;
@@ -102,10 +104,17 @@ function getDemoProducts(): Product[] {
 
 function placeDemoInvoice(
   items: InvoiceItemInput[],
-  customerName: string | null
+  customerName: string,
+  customerAddress: string
 ): PlaceInvoiceResult {
   if (items.length === 0) {
     return { ok: false, error: "Add at least one item." };
+  }
+  if (!customerName.trim()) {
+    return { ok: false, error: "Customer name is required." };
+  }
+  if (!customerAddress.trim()) {
+    return { ok: false, error: "Customer address is required." };
   }
 
   // Validate everything first (all-or-nothing), tracking a running stock
@@ -160,7 +169,8 @@ function placeDemoInvoice(
 
   const invoice: InvoiceDetail = {
     id: demoNextInvoiceId++,
-    customerName: customerName || null,
+    customerName: customerName.trim(),
+    customerAddress: customerAddress.trim(),
     subtotal,
     gstAmount,
     total,
@@ -179,6 +189,7 @@ function getDemoInvoices(): InvoiceSummary[] {
     .map((inv) => ({
       id: inv.id,
       customerName: inv.customerName,
+      customerAddress: inv.customerAddress,
       itemsLabel: inv.items.map((it) => `${it.productName} x${it.qty}`).join(", "),
       subtotal: inv.subtotal,
       gstAmount: inv.gstAmount,
@@ -228,11 +239,12 @@ function removeDemoStock(name: string, qty: number): ProductResult {
   return { ok: true, product: { ...product } };
 }
 
-function updateDemoProductGst(name: string, gstRate: number): ProductResult {
+function updateDemoProduct(name: string, cost: number, gstRate: number): ProductResult {
   const product = demoProducts.find((p) => p.name.toLowerCase() === name.toLowerCase());
   if (!product) {
     return { ok: false, error: `Product "${name}" was not found.` };
   }
+  product.cost = cost;
   product.gstRate = gstRate;
   return { ok: true, product: { ...product } };
 }
@@ -266,6 +278,8 @@ function parseInvoiceError(message: string): string {
   if (insufficient) return `Only ${insufficient[2]} of ${insufficient[1]} in stock.`;
 
   if (message.includes("no_items")) return "Add at least one item.";
+  if (message.includes("customer_name_required")) return "Customer name is required.";
+  if (message.includes("customer_address_required")) return "Customer address is required.";
 
   return "Failed to place the order. Please try again.";
 }
@@ -409,19 +423,26 @@ export async function removeStock(
   return { ok: true, product: toProduct(row) };
 }
 
-/** Sets a product's GST rate — used by the Stock Entry "Update GST rate" form. */
-export async function updateProductGst(name: string, gstRate: number): Promise<ProductResult> {
+/** Sets a product's cost and GST rate — used by the Stock Entry "Edit product" form. */
+export async function updateProduct(
+  name: string,
+  cost: number,
+  gstRate: number
+): Promise<ProductResult> {
+  if (!Number.isFinite(cost) || cost < 0) {
+    return { ok: false, error: "Cost must be 0 or more." };
+  }
   if (!isValidGstRate(gstRate)) {
     return { ok: false, error: `GST rate must be one of: ${GST_RATES.join("%, ")}%.` };
   }
 
   if (isDemoMode()) {
-    return updateDemoProductGst(name, gstRate);
+    return updateDemoProduct(name, cost, gstRate);
   }
 
   const { data, error } = await getClient()
     .from("products")
-    .update({ gst_rate: gstRate })
+    .update({ cost, gst_rate: gstRate })
     .eq("name", name)
     .select("id, name, cost, stock, gst_rate")
     .maybeSingle();
@@ -442,7 +463,8 @@ export async function updateProductGst(name: string, gstRate: number): Promise<P
  */
 export async function placeInvoice(
   items: InvoiceItemInput[],
-  customerName?: string
+  customerName: string,
+  customerAddress: string
 ): Promise<PlaceInvoiceResult> {
   const cleanItems = items
     .map((it) => ({ name: (it.name ?? "").trim(), qty: Number(it.qty) }))
@@ -457,14 +479,22 @@ export async function placeInvoice(
     }
   }
 
-  const cleanCustomerName = customerName?.trim() || null;
+  const cleanCustomerName = (customerName ?? "").trim();
+  const cleanCustomerAddress = (customerAddress ?? "").trim();
+  if (!cleanCustomerName) {
+    return { ok: false, error: "Customer name is required." };
+  }
+  if (!cleanCustomerAddress) {
+    return { ok: false, error: "Customer address is required." };
+  }
 
   if (isDemoMode()) {
-    return placeDemoInvoice(cleanItems, cleanCustomerName);
+    return placeDemoInvoice(cleanItems, cleanCustomerName, cleanCustomerAddress);
   }
 
   const { data, error } = await getClient().rpc("place_invoice", {
     p_customer_name: cleanCustomerName,
+    p_customer_address: cleanCustomerAddress,
     p_items: cleanItems,
   });
 
@@ -487,14 +517,17 @@ export async function getInvoices(): Promise<InvoiceSummary[]> {
 
   const { data, error } = await getClient()
     .from("invoices")
-    .select("id, customer_name, subtotal, gst_amount, total, created_at, invoice_items(product_name, qty)")
+    .select(
+      "id, customer_name, customer_address, subtotal, gst_amount, total, created_at, invoice_items(product_name, qty)"
+    )
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
   return (data ?? []).map((inv) => ({
     id: inv.id,
-    customerName: inv.customer_name,
+    customerName: inv.customer_name ?? "",
+    customerAddress: inv.customer_address ?? "",
     itemsLabel: ((inv.invoice_items ?? []) as { product_name: string; qty: number }[])
       .map((it) => `${it.product_name} x${it.qty}`)
       .join(", "),
@@ -513,7 +546,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
   const { data, error } = await getClient()
     .from("invoices")
     .select(
-      "id, customer_name, subtotal, gst_amount, total, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+      "id, customer_name, customer_address, subtotal, gst_amount, total, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -533,7 +566,8 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
 
   return {
     id: data.id,
-    customerName: data.customer_name,
+    customerName: data.customer_name ?? "",
+    customerAddress: data.customer_address ?? "",
     subtotal: Number(data.subtotal),
     gstAmount: Number(data.gst_amount),
     total: Number(data.total),

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createProduct, getProducts, getSettings, isDemoMode, updateProductGst } from "@/lib/db";
+import { createProduct, getProducts, getSettings, isDemoMode, updateProduct } from "@/lib/db";
 
 export async function GET() {
   try {
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  let body: { name?: string; gstRate?: number };
+  let body: { name?: string; cost?: number; gstRate?: number };
   try {
     body = await request.json();
   } catch {
@@ -49,16 +49,17 @@ export async function PATCH(request: NextRequest) {
   }
 
   const name = typeof body.name === "string" ? body.name : "";
+  const cost = Number(body.cost);
   const gstRate = Number(body.gstRate);
 
   try {
-    const result = await updateProductGst(name, gstRate);
+    const result = await updateProduct(name, cost, gstRate);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return NextResponse.json(result);
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Failed to update the GST rate." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update the product." }, { status: 500 });
   }
 }

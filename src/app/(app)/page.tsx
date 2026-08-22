@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState("");
 
   const [customerName, setCustomerName] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pickProduct, setPickProduct] = useState("");
   const [pickQty, setPickQty] = useState(1);
@@ -89,9 +90,11 @@ export default function DashboardPage() {
     setCart((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const canSubmit = cart.length > 0 && customerName.trim().length > 0 && customerAddress.trim().length > 0;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (cart.length === 0) return;
+    if (!canSubmit) return;
     setMessage(null);
     setSubmitting(true);
     try {
@@ -100,6 +103,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerName,
+          customerAddress,
           items: cart.map((c) => ({ name: c.name, qty: c.qty })),
         }),
       });
@@ -157,15 +161,31 @@ export default function DashboardPage() {
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="customer">
-                    Customer / Bill to <span className="text-slate-400">(optional)</span>
+                    Customer name
                   </label>
                   <input
                     id="customer"
                     type="text"
+                    required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
                     placeholder="Shown on the invoice"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="customer-address">
+                    Customer address
+                  </label>
+                  <textarea
+                    id="customer-address"
+                    required
+                    value={customerAddress}
+                    onChange={(e) => setCustomerAddress(e.target.value)}
+                    rows={2}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    placeholder="Billing address, shown on the invoice"
                   />
                 </div>
 
@@ -246,7 +266,7 @@ export default function DashboardPage() {
 
                 <button
                   type="submit"
-                  disabled={submitting || cart.length === 0}
+                  disabled={submitting || !canSubmit}
                   className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
                 >
                   {submitting ? "Placing order…" : "Place order"}

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { placeInvoice, type InvoiceItemInput } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
-  let body: { customerName?: string; items?: { name?: string; qty?: number }[] };
+  let body: {
+    customerName?: string;
+    customerAddress?: string;
+    items?: { name?: string; qty?: number }[];
+  };
   try {
     body = await request.json();
   } catch {
@@ -12,10 +16,11 @@ export async function POST(request: NextRequest) {
   const items: InvoiceItemInput[] = Array.isArray(body.items)
     ? body.items.map((it) => ({ name: typeof it.name === "string" ? it.name : "", qty: Number(it.qty) }))
     : [];
-  const customerName = typeof body.customerName === "string" ? body.customerName : undefined;
+  const customerName = typeof body.customerName === "string" ? body.customerName : "";
+  const customerAddress = typeof body.customerAddress === "string" ? body.customerAddress : "";
 
   try {
-    const result = await placeInvoice(items, customerName);
+    const result = await placeInvoice(items, customerName, customerAddress);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

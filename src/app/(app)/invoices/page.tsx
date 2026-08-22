@@ -5,7 +5,8 @@ import Link from "next/link";
 
 type Invoice = {
   id: number;
-  customerName: string | null;
+  customerName: string;
+  customerAddress: string;
   itemsLabel: string;
   subtotal: number;
   gstAmount: number;
@@ -69,7 +70,7 @@ export default function InvoicesPage() {
     return invoices.filter((inv) => {
       if (dateFilter && toDateInputValue(inv.createdAt) !== dateFilter) return false;
       if (q) {
-        const haystack = `${inv.customerName ?? ""} ${inv.itemsLabel}`.toLowerCase();
+        const haystack = `${inv.customerName} ${inv.customerAddress} ${inv.itemsLabel}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;

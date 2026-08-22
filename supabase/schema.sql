@@ -110,6 +110,9 @@ create table if not exists invoices (
   created_at timestamptz not null default now()
 );
 
+-- Customer name is now paired with a required billing address.
+alter table invoices add column if not exists customer_address text;
+
 create table if not exists invoice_items (
   id bigint generated always as identity primary key,
   invoice_id bigint not null references invoices(id) on delete cascade,
@@ -127,13 +130,18 @@ create table if not exists invoice_items (
 
 create index if not exists invoice_items_invoice_id_idx on invoice_items(invoice_id);
 
--- Takes a customer name and a JSON array of {"name": product, "qty": n},
--- and does the whole invoice — stock checks, stock decrements, line items,
--- and the invoice header's totals — as ONE transaction. If any item can't
--- be fulfilled (product missing or insufficient stock), the exception
--- aborts the whole function and every change it made this call is rolled
--- back, so a multi-item order can never partially succeed.
-create or replace function place_invoice(p_customer_name text, p_items jsonb)
+-- Takes a customer name + address and a JSON array of {"name": product,
+-- "qty": n}, and does the whole invoice — stock checks, stock decrements,
+-- line items, and the invoice header's totals — as ONE transaction. If any
+-- item can't be fulfilled (product missing or insufficient stock), the
+-- exception aborts the whole function and every change it made this call
+-- is rolled back, so a multi-item order can never partially succeed.
+--
+-- Signature changed (added p_customer_address) — DROP first since CREATE
+-- OR REPLACE can't add a parameter to an existing function.
+drop function if exists place_invoice(text, jsonb);
+
+create function place_invoice(p_customer_name text, p_customer_address text, p_items jsonb)
 returns table (invoice_id bigint, invoice_total numeric)
 language plpgsql
 as $$
@@ -154,8 +162,16 @@ begin
     raise exception 'no_items';
   end if;
 
-  insert into invoices (customer_name, subtotal, gst_amount, total)
-  values (nullif(p_customer_name, ''), 0, 0, 0)
+  if p_customer_name is null or btrim(p_customer_name) = '' then
+    raise exception 'customer_name_required';
+  end if;
+
+  if p_customer_address is null or btrim(p_customer_address) = '' then
+    raise exception 'customer_address_required';
+  end if;
+
+  insert into invoices (customer_name, customer_address, subtotal, gst_amount, total)
+  values (p_customer_name, p_customer_address, 0, 0, 0)
   returning id into v_invoice_id;
 
   for v_item in select * from jsonb_array_elements(p_items)

@@ -17,7 +17,8 @@ type InvoiceItem = {
 
 type Invoice = {
   id: number;
-  customerName: string | null;
+  customerName: string;
+  customerAddress: string;
   subtotal: number;
   gstAmount: number;
   total: number;
@@ -155,6 +156,9 @@ export default function InvoicePage() {
         <div className="border-b-2 border-slate-900 p-4 sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bill to</p>
           <p className="text-sm font-medium">{invoice.customerName || "Cash / Walk-in customer"}</p>
+          {invoice.customerAddress && (
+            <p className="whitespace-pre-line text-sm text-slate-600">{invoice.customerAddress}</p>
+          )}
         </div>
 
         {/* Line items */}

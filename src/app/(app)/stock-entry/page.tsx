@@ -25,11 +25,12 @@ export default function StockEntryPage() {
   const [removeMessage, setRemoveMessage] = useState<Message | null>(null);
   const [removeSubmitting, setRemoveSubmitting] = useState(false);
 
-  // GST rate form
-  const [gstProduct, setGstProduct] = useState("");
-  const [gstRate, setGstRate] = useState(GST_RATES[1]);
-  const [gstMessage, setGstMessage] = useState<Message | null>(null);
-  const [gstSubmitting, setGstSubmitting] = useState(false);
+  // Edit product form (cost + GST rate)
+  const [editProduct, setEditProduct] = useState("");
+  const [editCost, setEditCost] = useState<number | "">("");
+  const [editGstRate, setEditGstRate] = useState(GST_RATES[1]);
+  const [editMessage, setEditMessage] = useState<Message | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   // New product form
   const [newName, setNewName] = useState("");
@@ -58,7 +59,7 @@ export default function StockEntryPage() {
       setProducts(list);
       setRestockProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
       setRemoveProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
-      setGstProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
+      setEditProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
     } catch {
       setLoadError("Failed to reach the server.");
       setProducts([]);
@@ -72,9 +73,12 @@ export default function StockEntryPage() {
   }, []);
 
   useEffect(() => {
-    const product = products.find((p) => p.name === gstProduct);
-    if (product) setGstRate(product.gstRate);
-  }, [gstProduct, products]);
+    const product = products.find((p) => p.name === editProduct);
+    if (product) {
+      setEditCost(product.cost);
+      setEditGstRate(product.gstRate);
+    }
+  }, [editProduct, products]);
 
   async function handleRestock(e: FormEvent) {
     e.preventDefault();
@@ -129,25 +133,28 @@ export default function StockEntryPage() {
     }
   }
 
-  async function handleGstUpdate(e: FormEvent) {
+  async function handleEditProduct(e: FormEvent) {
     e.preventDefault();
-    setGstMessage(null);
-    setGstSubmitting(true);
+    setEditMessage(null);
+    setEditSubmitting(true);
     try {
       const res = await fetch("/api/products", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: gstProduct, gstRate }),
+        body: JSON.stringify({ name: editProduct, cost: editCost, gstRate: editGstRate }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setGstMessage({ type: "error", text: data.error || "Failed to update GST rate." });
+        setEditMessage({ type: "error", text: data.error || "Failed to update the product." });
         return;
       }
-      setGstMessage({ type: "ok", text: `${data.product.name} is now taxed at ${data.product.gstRate}% GST.` });
+      setEditMessage({
+        type: "ok",
+        text: `${data.product.name} updated: cost ${data.product.cost}, GST ${data.product.gstRate}%.`,
+      });
       await loadProducts();
     } finally {
-      setGstSubmitting(false);
+      setEditSubmitting(false);
     }
   }
 
@@ -184,7 +191,9 @@ export default function StockEntryPage() {
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
         <h1 className="text-xl font-semibold text-slate-900">Stock Entry</h1>
-        <p className="text-sm text-slate-500">Add stock, set GST rates, or register a new product.</p>
+        <p className="text-sm text-slate-500">
+          Add or remove stock, edit a product&apos;s price/GST rate, or register a new product.
+        </p>
       </header>
 
       {loading ? (
@@ -344,60 +353,76 @@ export default function StockEntryPage() {
           </section>
 
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">Update GST rate</h2>
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">Edit product</h2>
+            <p className="mb-4 -mt-2 text-xs text-slate-500">Update an existing product&apos;s price or GST rate.</p>
             {products.length === 0 ? (
               <p className="text-sm text-slate-500">No products yet — add one first.</p>
             ) : (
-              <form onSubmit={handleGstUpdate} className="flex flex-col gap-4">
+              <form onSubmit={handleEditProduct} className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="gst-product">
+                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="edit-product">
                     Product
                   </label>
                   <select
-                    id="gst-product"
-                    value={gstProduct}
-                    onChange={(e) => setGstProduct(e.target.value)}
+                    id="edit-product"
+                    value={editProduct}
+                    onChange={(e) => setEditProduct(e.target.value)}
                     className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
                   >
                     {products.map((p) => (
                       <option key={p.name} value={p.name}>
-                        {p.name} — currently {p.gstRate}%
+                        {p.name} — {p.cost} / {p.gstRate}%
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="gst-rate">
-                    GST rate
-                  </label>
-                  <select
-                    id="gst-rate"
-                    value={gstRate}
-                    onChange={(e) => setGstRate(Number(e.target.value))}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                  >
-                    {GST_RATES.map((rate) => (
-                      <option key={rate} value={rate}>
-                        {rate}%
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="edit-cost">
+                      Cost
+                    </label>
+                    <input
+                      id="edit-cost"
+                      type="number"
+                      min={0}
+                      value={editCost}
+                      onChange={(e) => setEditCost(e.target.value === "" ? "" : Number(e.target.value))}
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="edit-gst">
+                      GST rate
+                    </label>
+                    <select
+                      id="edit-gst"
+                      value={editGstRate}
+                      onChange={(e) => setEditGstRate(Number(e.target.value))}
+                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    >
+                      {GST_RATES.map((rate) => (
+                        <option key={rate} value={rate}>
+                          {rate}%
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  disabled={gstSubmitting || !gstProduct}
+                  disabled={editSubmitting || !editProduct || editCost === ""}
                   className="rounded bg-blue-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-800 disabled:opacity-50"
                 >
-                  {gstSubmitting ? "Saving…" : "Update GST rate"}
+                  {editSubmitting ? "Saving…" : "Save changes"}
                 </button>
               </form>
             )}
 
-            {gstMessage && (
-              <p className={`mt-4 text-sm ${gstMessage.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
-                {gstMessage.text}
+            {editMessage && (
+              <p className={`mt-4 text-sm ${editMessage.type === "ok" ? "text-emerald-600" : "text-red-600"}`}>
+                {editMessage.text}
               </p>
             )}
           </section>
