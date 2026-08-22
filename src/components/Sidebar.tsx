@@ -38,17 +38,17 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 text-white lg:hidden print:hidden">
+      <div className="flex items-center justify-between border-b border-[#123028] bg-[#0e2622] px-4 py-3 text-white lg:hidden print:hidden">
         <button
           onClick={() => setOpen(true)}
           aria-label="Open menu"
-          className="rounded p-1 text-xl leading-none hover:bg-slate-800"
+          className="rounded-xl p-1 text-xl leading-none hover:bg-white/10"
         >
           ☰
         </button>
         <div className="flex items-center gap-2">
           <Brand companyName={companyName} logoDataUrl={logoDataUrl} compact />
-          <p className="text-sm font-semibold tracking-wide">STOCK WAREHOUSE</p>
+          <p className="text-sm font-bold tracking-tight">CounterBook</p>
         </div>
         <span className="w-7" aria-hidden />
       </div>
@@ -63,24 +63,24 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 -translate-x-full transform flex-col bg-slate-900 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:w-60 lg:translate-x-0 print:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-64 shrink-0 -translate-x-full transform flex-col bg-[#0e2622] text-stone-300 transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:w-64 lg:translate-x-0 print:hidden ${
           open ? "translate-x-0" : ""
         }`}
       >
-        <div className="h-1 shrink-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500" />
+        <div className="h-1 shrink-0 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-400" />
 
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-5">
+        <div className="flex items-center justify-between border-b border-[#123028] px-5 py-5">
           <div className="flex items-center gap-3">
             <Brand companyName={companyName} logoDataUrl={logoDataUrl} />
             <div>
-              <p className="text-sm font-semibold tracking-wide text-white">STOCK WAREHOUSE</p>
-              <p className="text-xs text-slate-500">{companyName || "Inventory Console"}</p>
+              <p className="text-base font-bold tracking-tight text-white">CounterBook</p>
+              <p className="text-xs text-stone-400">{companyName || "Billing & stock console"}</p>
             </div>
           </div>
           <button
             onClick={() => setOpen(false)}
             aria-label="Close menu"
-            className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+            className="rounded-xl p-1 text-stone-400 hover:bg-white/10 hover:text-white lg:hidden"
           >
             ✕
           </button>
@@ -95,23 +95,25 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   active
-                    ? "border-l-2 border-indigo-400 bg-indigo-500/15 text-white"
-                    : "border-l-2 border-transparent text-slate-400 hover:bg-slate-800/60 hover:text-white"
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-950/40"
+                    : "text-stone-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
-                <span aria-hidden>{item.icon}</span>
+                <span className="text-base" aria-hidden>
+                  {item.icon}
+                </span>
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-slate-800 px-3 py-4">
+        <div className="border-t border-[#123028] px-3 py-4">
           <button
             onClick={handleLogout}
-            className="w-full rounded px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-800/60 hover:text-white"
+            className="w-full rounded-xl px-3 py-2 text-left text-sm text-stone-400 hover:bg-white/5 hover:text-white"
           >
             ↩ Log out
           </button>
@@ -133,12 +135,12 @@ function Brand({
   const dims = compact ? "h-6 w-6 text-xs" : "h-9 w-9 text-sm";
   if (logoDataUrl) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={logoDataUrl} alt="Company logo" className={`${dims} shrink-0 rounded object-contain`} />;
+    return <img src={logoDataUrl} alt="Company logo" className={`${dims} shrink-0 rounded-xl object-contain`} />;
   }
-  const initial = companyName.trim().charAt(0).toUpperCase() || "S";
+  const initial = companyName.trim().charAt(0).toUpperCase() || "C";
   return (
     <span
-      className={`flex ${dims} shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 font-bold text-white`}
+      className={`flex ${dims} shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 font-bold text-[#0e2622]`}
       aria-hidden
     >
       {initial}

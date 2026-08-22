@@ -143,7 +143,7 @@ export default function InvoicePage() {
   if (loading) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8">
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       </main>
     );
   }
@@ -151,7 +151,7 @@ export default function InvoicePage() {
   if (error || !invoice || !settings) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8">
-        <Link href="/invoices" className="text-sm text-slate-500 hover:text-slate-900">
+        <Link href="/invoices" className="text-sm text-stone-500 hover:text-stone-900">
           ← Back to invoices
         </Link>
         <p className="mt-4 text-sm text-red-600">{error || "Invoice not found."}</p>
@@ -179,29 +179,29 @@ export default function InvoicePage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-6 sm:px-8 sm:py-8 print:px-0 print:py-0">
       <div className="mb-4 flex items-center justify-between print:hidden">
-        <Link href="/invoices" className="text-sm text-slate-500 hover:text-slate-900">
+        <Link href="/invoices" className="text-sm text-stone-500 hover:text-stone-900">
           ← Back to invoices
         </Link>
         <PrintButton />
       </div>
 
       {invoice.status === "voided" && (
-        <div className="mb-4 rounded border-2 border-red-600 bg-red-50 px-4 py-3 text-red-800">
+        <div className="mb-4 rounded-xl border-2 border-red-600 bg-red-50 px-4 py-3 text-red-800">
           <p className="text-lg font-bold uppercase tracking-widest">⚠ Voided</p>
           {invoice.voidReason && <p className="text-sm">Reason: {invoice.voidReason}</p>}
         </div>
       )}
 
-      <div className="border-2 border-slate-900 bg-white text-slate-900 print:border-2">
+      <div className="border-2 border-stone-900 bg-white text-stone-900 print:border-2">
         {/* Header */}
-        <div className="flex flex-col gap-4 border-b-2 border-slate-900 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
+        <div className="flex flex-col gap-4 border-b-2 border-stone-900 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
           <div className="flex items-start gap-3">
             {settings.logoDataUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={settings.logoDataUrl}
                 alt={`${settings.companyName || "Company"} logo`}
-                className="h-12 w-12 shrink-0 rounded object-contain"
+                className="h-12 w-12 shrink-0 rounded-xl object-contain"
               />
             )}
             <div>
@@ -209,22 +209,22 @@ export default function InvoicePage() {
                 {settings.companyName || "Your Company Name"}
               </h1>
               {settings.address && (
-                <p className="whitespace-pre-line text-sm text-slate-700">{settings.address}</p>
+                <p className="whitespace-pre-line text-sm text-stone-700">{settings.address}</p>
               )}
               {(settings.phone || settings.email) && (
-                <p className="text-sm text-slate-700">
+                <p className="text-sm text-stone-700">
                   {[settings.phone && `Ph: ${settings.phone}`, settings.email].filter(Boolean).join("  |  ")}
                 </p>
               )}
-              {settings.gstin && <p className="text-sm font-medium text-slate-700">GSTIN: {settings.gstin}</p>}
+              {settings.gstin && <p className="text-sm font-medium text-stone-700">GSTIN: {settings.gstin}</p>}
             </div>
           </div>
           <div className="shrink-0 sm:text-right">
             <p className="text-2xl font-bold uppercase tracking-widest">Tax Invoice</p>
-            <p className="mt-1 text-sm text-slate-700">
+            <p className="mt-1 text-sm text-stone-700">
               Invoice No: <span className="font-medium">{invoiceNumber}</span>
             </p>
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-stone-700">
               Date: <span className="font-medium">{date}</span>
             </p>
             {invoice.status === "active" && (
@@ -242,11 +242,11 @@ export default function InvoicePage() {
         )}
 
         {/* Bill to */}
-        <div className="border-b-2 border-slate-900 p-4 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bill to</p>
+        <div className="border-b-2 border-stone-900 p-4 sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Bill to</p>
           <p className="text-sm font-medium">{invoice.customerName || "Cash / Walk-in customer"}</p>
           {invoice.customerAddress && (
-            <p className="whitespace-pre-line text-sm text-slate-600">{invoice.customerAddress}</p>
+            <p className="whitespace-pre-line text-sm text-stone-600">{invoice.customerAddress}</p>
           )}
         </div>
 
@@ -254,7 +254,7 @@ export default function InvoicePage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
-              <tr className="bg-slate-100">
+              <tr className="bg-stone-100">
                 <Th className="text-left">#</Th>
                 <Th className="text-left">Description</Th>
                 <Th className="text-right">Qty</Th>
@@ -293,13 +293,13 @@ export default function InvoicePage() {
         </div>
 
         {/* Totals */}
-        <div className="flex justify-end border-t-2 border-slate-900 p-4 sm:p-6">
+        <div className="flex justify-end border-t-2 border-stone-900 p-4 sm:p-6">
           <table className="w-full max-w-xs text-sm">
             <tbody>
               <TotalRow label="Taxable Amount" value={money(invoice.subtotal)} />
               <TotalRow label="CGST" value={money(totalCgst)} />
               <TotalRow label="SGST" value={money(totalSgst)} />
-              <tr className="border-t-2 border-slate-900">
+              <tr className="border-t-2 border-stone-900">
                 <td className="py-2 text-sm font-bold uppercase">Grand Total</td>
                 <td className="py-2 text-right text-base font-bold">{money(invoice.total)}</td>
               </tr>
@@ -308,22 +308,22 @@ export default function InvoicePage() {
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col gap-6 border-t-2 border-slate-900 p-4 sm:flex-row sm:items-end sm:justify-between sm:p-6">
-          <p className="max-w-xs text-xs text-slate-500">{settings.invoiceNote}</p>
-          <div className="text-left text-xs text-slate-600 sm:text-center">
+        <div className="flex flex-col gap-6 border-t-2 border-stone-900 p-4 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+          <p className="max-w-xs text-xs text-stone-500">{settings.invoiceNote}</p>
+          <div className="text-left text-xs text-stone-600 sm:text-center">
             <p className="mb-8">For {settings.companyName || "Your Company Name"}</p>
-            <p className="border-t border-slate-400 pt-1">Authorized Signatory</p>
+            <p className="border-t border-stone-400 pt-1">Authorized Signatory</p>
           </div>
         </div>
       </div>
 
       {invoice.status === "active" && (
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 print:hidden">
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">💳 Record payment</h2>
+          <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md">
+            <h2 className="mb-4 text-sm font-semibold text-stone-900">💳 Record payment</h2>
             <form onSubmit={handleRecordPayment} className="flex flex-col gap-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="amount-paid">
+                <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="amount-paid">
                   Amount paid
                 </label>
                 <input
@@ -333,9 +333,9 @@ export default function InvoicePage() {
                   max={invoice.total}
                   value={amountPaidInput}
                   onChange={(e) => setAmountPaidInput(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
                 />
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-stone-500">
                   Total {money(invoice.total)} — balance due{" "}
                   {money(Math.max(0, invoice.total - (typeof amountPaidInput === "number" ? amountPaidInput : 0)))}
                 </p>
@@ -343,32 +343,32 @@ export default function InvoicePage() {
               <button
                 type="submit"
                 disabled={paySubmitting || amountPaidInput === ""}
-                className="self-start rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                className="self-start rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
               >
                 {paySubmitting ? "Saving…" : "Save payment"}
               </button>
-              {payMessage && <p className="text-sm text-slate-600">{payMessage}</p>}
+              {payMessage && <p className="text-sm text-stone-600">{payMessage}</p>}
             </form>
           </section>
 
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-1 text-sm font-semibold text-slate-900">🚫 Void this invoice</h2>
-            <p className="mb-4 text-xs text-slate-500">
+          <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md">
+            <h2 className="mb-1 text-sm font-semibold text-stone-900">🚫 Void this invoice</h2>
+            <p className="mb-4 text-xs text-stone-500">
               Restores stock for every item on this invoice. Cannot be undone.
             </p>
             {!showVoidForm ? (
               <button
                 type="button"
                 onClick={() => setShowVoidForm(true)}
-                className="rounded border border-red-700 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
+                className="rounded-xl border border-red-700 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50"
               >
                 Void invoice…
               </button>
             ) : (
               <form onSubmit={handleVoid} className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="void-reason">
-                    Reason <span className="text-slate-400">(required)</span>
+                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="void-reason">
+                    Reason <span className="text-stone-400">(required)</span>
                   </label>
                   <input
                     id="void-reason"
@@ -376,21 +376,21 @@ export default function InvoicePage() {
                     value={voidReasonInput}
                     onChange={(e) => setVoidReasonInput(e.target.value)}
                     placeholder="e.g. customer canceled, entered by mistake"
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-red-500"
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
                   />
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="submit"
                     disabled={voidSubmitting || !voidReasonInput.trim()}
-                    className="rounded bg-red-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800 disabled:opacity-50"
+                    className="rounded-xl bg-red-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800 disabled:opacity-50"
                   >
                     {voidSubmitting ? "Voiding…" : "Confirm void"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowVoidForm(false)}
-                    className="rounded border border-gray-300 px-4 py-2 text-sm text-slate-600 hover:bg-gray-50"
+                    className="rounded-xl border border-stone-300 px-4 py-2 text-sm text-stone-600 hover:bg-stone-50"
                   >
                     Cancel
                   </button>
@@ -429,20 +429,20 @@ function PaymentPill({ status }: { status: PaymentStatus }) {
 
 function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <th className={`border border-slate-900 px-2 py-2 text-xs font-semibold uppercase tracking-wide sm:px-3 ${className}`}>
+    <th className={`border border-stone-900 px-2 py-2 text-xs font-semibold uppercase tracking-wide sm:px-3 ${className}`}>
       {children}
     </th>
   );
 }
 
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`border border-slate-900 px-2 py-2 align-top sm:px-3 ${className}`}>{children}</td>;
+  return <td className={`border border-stone-900 px-2 py-2 align-top sm:px-3 ${className}`}>{children}</td>;
 }
 
 function TotalRow({ label, value }: { label: string; value: string }) {
   return (
     <tr>
-      <td className="py-1 text-slate-600">{label}</td>
+      <td className="py-1 text-stone-600">{label}</td>
       <td className="py-1 text-right">{value}</td>
     </tr>
   );

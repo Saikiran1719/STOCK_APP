@@ -1,4 +1,4 @@
-# Stock Warehouse
+# CounterBook
 
 An internal inventory console: place multi-item orders (reduces stock, generates a
 printable GST invoice), track payment and void mistaken invoices, browse/reprint every
@@ -18,8 +18,13 @@ Vercel.
 - **Status at a glance** — stock/payment/void indicators are icon-prefixed pills
   (✓ In stock, ⚠ Low stock, ✕ Out of stock, ✓ Paid, ◐ Partial, ! Unpaid, ⊘ Voided) rather
   than plain colored text, and card headers carry a small icon each.
-- Accent color is indigo/violet throughout (buttons, focus rings, active nav, the
-  sidebar's top gradient bar) — swapped from the earlier plain blue.
+- **Brand identity** — renamed from the internal "Stock Warehouse" project name to
+  **CounterBook**. Accent color is teal/emerald throughout (buttons, focus rings, active
+  nav, the sidebar's top gradient bar, the login screen), set against warm stone
+  neutrals (not cold gray) and Plus Jakarta Sans for headings/UI text — deliberately
+  distinct from generic admin-template blue/Inter, closer to the polished, approachable
+  feel of consumer billing apps like Vyapar. The sidebar itself uses a custom dark teal
+  ink color rather than a default slate/black.
 
 ## How it works
 

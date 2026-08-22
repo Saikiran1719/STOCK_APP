@@ -4,7 +4,7 @@ export default function PrintButton() {
   return (
     <button
       onClick={() => window.print()}
-      className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+      className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30"
     >
       Print invoice
     </button>

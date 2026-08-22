@@ -108,20 +108,21 @@ export default function SettingsPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Configuration</p>
+        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Settings</h1>
+        <p className="mt-1 text-sm text-stone-500">
           Company details shown on printed invoices.
         </p>
       </header>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : loadError ? (
         <p className="text-sm text-red-600">{loadError}</p>
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
+          className="flex flex-col gap-4 rounded-2xl border border-stone-100 bg-white p-4 shadow-md sm:p-6"
         >
           <Field label="Logo" hint="Shown in the sidebar and on invoices. Under 500KB.">
             <div className="flex items-center gap-4">
@@ -130,15 +131,15 @@ export default function SettingsPage() {
                 <img
                   src={settings.logoDataUrl}
                   alt="Company logo preview"
-                  className="h-14 w-14 rounded border border-gray-200 object-contain"
+                  className="h-14 w-14 rounded-xl border border-stone-200 object-contain"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded border border-dashed border-gray-300 text-xs text-slate-400">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-stone-300 text-xs text-stone-400">
                   No logo
                 </div>
               )}
               <div className="flex flex-col gap-1">
-                <label className="w-fit cursor-pointer rounded border border-gray-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-gray-50">
+                <label className="w-fit cursor-pointer rounded-xl border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50">
                   Choose image
                   <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
                 </label>
@@ -161,7 +162,7 @@ export default function SettingsPage() {
               type="text"
               value={settings.companyName}
               onChange={(e) => update("companyName", e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
             />
           </Field>
 
@@ -170,7 +171,7 @@ export default function SettingsPage() {
               value={settings.address}
               onChange={(e) => update("address", e.target.value)}
               rows={2}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
             />
           </Field>
 
@@ -180,7 +181,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.phone}
                 onChange={(e) => update("phone", e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
               />
             </Field>
             <Field label="Email">
@@ -188,7 +189,7 @@ export default function SettingsPage() {
                 type="email"
                 value={settings.email}
                 onChange={(e) => update("email", e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
               />
             </Field>
           </div>
@@ -199,7 +200,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.gstin}
                 onChange={(e) => update("gstin", e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
               />
             </Field>
             <Field label="Currency symbol" hint="e.g. ₹, $, Rs.">
@@ -207,7 +208,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.currencySymbol}
                 onChange={(e) => update("currencySymbol", e.target.value)}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
               />
             </Field>
           </div>
@@ -217,14 +218,14 @@ export default function SettingsPage() {
               type="text"
               value={settings.invoiceNote}
               onChange={(e) => update("invoiceNote", e.target.value)}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
             />
           </Field>
 
           <button
             type="submit"
             disabled={saving}
-            className="mt-2 self-start rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            className="mt-2 self-start rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
           >
             {saving ? "Saving…" : "Save settings"}
           </button>
@@ -251,9 +252,9 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-600">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-stone-600">{label}</label>
       {children}
-      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-stone-400">{hint}</p>}
     </div>
   );
 }

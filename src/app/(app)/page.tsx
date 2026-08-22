@@ -127,12 +127,13 @@ export default function DashboardPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500">Warehouse stock overview and order entry.</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">Overview</p>
+        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Dashboard</h1>
+        <p className="mt-1 text-sm text-stone-500">Stock overview and order entry.</p>
       </header>
 
       {demo && !loading && !loadError && (
-        <p className="mb-6 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <p className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Demo mode: showing sample data, not the real Supabase database. Orders placed here
           only change this in-memory copy (resets on server restart) until Supabase
           credentials are set in .env.local / Vercel.
@@ -140,7 +141,7 @@ export default function DashboardPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : loadError ? (
         <p className="text-sm text-red-600">{loadError}</p>
       ) : (
@@ -162,11 +163,11 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-            <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
-              <h2 className="mb-4 text-sm font-semibold text-slate-900">🛒 Place order</h2>
+            <section className="rounded-2xl border border-stone-100 bg-white p-5 shadow-md lg:col-span-2">
+              <h2 className="mb-4 text-sm font-semibold text-stone-900">🛒 Place order</h2>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="customer">
+                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="customer">
                     Customer name
                   </label>
                   <input
@@ -175,13 +176,13 @@ export default function DashboardPage() {
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
                     placeholder="Shown on the invoice"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="customer-address">
+                  <label className="mb-1 block text-xs font-medium text-stone-600" htmlFor="customer-address">
                     Customer address
                   </label>
                   <textarea
@@ -190,41 +191,41 @@ export default function DashboardPage() {
                     value={customerAddress}
                     onChange={(e) => setCustomerAddress(e.target.value)}
                     rows={2}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
                     placeholder="Billing address, shown on the invoice"
                   />
                 </div>
 
-                <div className="rounded border border-gray-200 p-3">
-                  <p className="mb-2 text-xs font-medium text-slate-600">Add item</p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <select
-                      value={pickProduct}
-                      onChange={(e) => {
-                        setPickProduct(e.target.value);
-                        setPickQty(1);
-                      }}
-                      className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-                    >
-                      {products.map((p) => (
-                        <option key={p.name} value={p.name} disabled={remainingStock(p.name) <= 0}>
-                          {p.name} — {remainingStock(p.name)} available
-                        </option>
-                      ))}
-                    </select>
+                <div className="rounded-xl border border-stone-200 p-3">
+                  <p className="mb-2 text-xs font-medium text-stone-600">Add item</p>
+                  <select
+                    value={pickProduct}
+                    onChange={(e) => {
+                      setPickProduct(e.target.value);
+                      setPickQty(1);
+                    }}
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
+                  >
+                    {products.map((p) => (
+                      <option key={p.name} value={p.name} disabled={remainingStock(p.name) <= 0}>
+                        {p.name} — {remainingStock(p.name)} available
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-2 flex gap-2">
                     <input
                       type="number"
                       min={1}
                       max={pickAvailable || undefined}
                       value={pickQty}
                       onChange={(e) => setPickQty(Number(e.target.value))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 sm:w-20"
+                      className="w-20 rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
                     />
                     <button
                       type="button"
                       onClick={addItem}
                       disabled={!pickProduct || pickQty < 1 || pickQty > pickAvailable}
-                      className="rounded border border-indigo-600 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
+                      className="flex-1 whitespace-nowrap rounded-xl border border-teal-600 px-3 py-2 text-sm font-medium text-teal-600 transition hover:bg-teal-50 disabled:opacity-50"
                     >
                       Add item
                     </button>
@@ -232,21 +233,21 @@ export default function DashboardPage() {
                 </div>
 
                 {cart.length > 0 && (
-                  <div className="overflow-hidden rounded border border-gray-200">
+                  <div className="overflow-hidden rounded-xl border border-stone-200">
                     {cart.map((item, i) => {
                       const line = lineTotal(item);
                       return (
                         <div
                           key={i}
-                          className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2 text-sm last:border-0"
+                          className="flex items-center justify-between gap-2 border-b border-stone-100 px-3 py-2 text-sm last:border-0"
                         >
                           <div className="flex min-w-0 items-center gap-2">
                             <ProductAvatar name={item.name} />
                             <div className="min-w-0">
-                              <p className="truncate font-medium text-slate-900">
+                              <p className="truncate font-medium text-stone-900">
                                 {item.name} × {item.qty}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-stone-500">
                                 {currency}
                                 {line.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                               </p>
@@ -256,14 +257,14 @@ export default function DashboardPage() {
                             type="button"
                             onClick={() => removeItem(i)}
                             aria-label={`Remove ${item.name}`}
-                            className="shrink-0 rounded px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            className="shrink-0 rounded-xl px-2 py-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
                           >
                             ✕
                           </button>
                         </div>
                       );
                     })}
-                    <div className="flex items-center justify-between bg-gray-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                    <div className="flex items-center justify-between bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-900">
                       <span>Total</span>
                       <span>
                         {currency}
@@ -276,7 +277,7 @@ export default function DashboardPage() {
                 <button
                   type="submit"
                   disabled={submitting || !canSubmit}
-                  className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-teal-600/20 transition hover:shadow-md hover:shadow-teal-600/30 disabled:opacity-50 disabled:shadow-none"
                 >
                   {submitting ? "Placing order…" : "Place order"}
                 </button>
@@ -289,14 +290,14 @@ export default function DashboardPage() {
               )}
             </section>
 
-            <section className="rounded-lg border border-gray-200 bg-white shadow-sm lg:col-span-3">
-              <div className="border-b border-gray-100 px-5 py-4">
-                <h2 className="text-sm font-semibold text-slate-900">📦 Stock</h2>
+            <section className="rounded-2xl border border-stone-100 bg-white shadow-md lg:col-span-3">
+              <div className="border-b border-stone-100 px-5 py-4">
+                <h2 className="text-sm font-semibold text-stone-900">📦 Stock</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-stone-100 text-left text-xs font-medium uppercase tracking-wide text-stone-500">
                       <th className="whitespace-nowrap px-5 py-3">Product</th>
                       <th className="whitespace-nowrap px-5 py-3">Cost</th>
                       <th className="whitespace-nowrap px-5 py-3">GST</th>
@@ -306,19 +307,19 @@ export default function DashboardPage() {
                   </thead>
                   <tbody>
                     {products.map((p) => (
-                      <tr key={p.name} className="border-b border-gray-50 last:border-0">
+                      <tr key={p.name} className="border-b border-stone-50 last:border-0">
                         <td className="whitespace-nowrap px-5 py-3">
-                          <div className="flex items-center gap-2 font-medium text-slate-900">
+                          <div className="flex items-center gap-2 font-medium text-stone-900">
                             <ProductAvatar name={p.name} />
                             {p.name}
                           </div>
                         </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">
+                        <td className="whitespace-nowrap px-5 py-3 text-stone-600">
                           {currency}
                           {p.cost.toLocaleString()}
                         </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">{p.gstRate}%</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">{p.stock}</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-stone-600">{p.gstRate}%</td>
+                        <td className="whitespace-nowrap px-5 py-3 text-stone-600">{p.stock}</td>
                         <td className="whitespace-nowrap px-5 py-3">
                           <StatusPill stock={p.stock} />
                         </td>
@@ -347,13 +348,22 @@ function KpiTile({
   tone?: "default" | "warn";
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-      <span className="text-xl leading-none" aria-hidden>
+    <div className="flex items-center gap-3 rounded-2xl border border-stone-100 bg-white p-4 shadow-md">
+      <span
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
+          tone === "warn" ? "bg-amber-50" : "bg-teal-50"
+        }`}
+        aria-hidden
+      >
         {icon}
       </span>
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-        <p className={`mt-1 text-2xl font-semibold ${tone === "warn" ? "text-amber-600" : "text-slate-900"}`}>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
+        <p
+          className={`mt-0.5 text-2xl font-bold tabular-nums ${
+            tone === "warn" ? "text-amber-600" : "text-stone-900"
+          }`}
+        >
           {value}
         </p>
       </div>
