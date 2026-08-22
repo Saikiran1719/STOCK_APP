@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { placeOrder } from "@/lib/db";
+import { placeInvoice, type InvoiceItemInput } from "@/lib/db";
 
 export async function POST(request: NextRequest) {
-  let body: { product?: string; qty?: number; customerName?: string };
+  let body: { customerName?: string; items?: { name?: string; qty?: number }[] };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const product = typeof body.product === "string" ? body.product : "";
-  const qty = Number(body.qty);
+  const items: InvoiceItemInput[] = Array.isArray(body.items)
+    ? body.items.map((it) => ({ name: typeof it.name === "string" ? it.name : "", qty: Number(it.qty) }))
+    : [];
   const customerName = typeof body.customerName === "string" ? body.customerName : undefined;
 
   try {
-    const result = await placeOrder(product, qty, customerName);
+    const result = await placeInvoice(items, customerName);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

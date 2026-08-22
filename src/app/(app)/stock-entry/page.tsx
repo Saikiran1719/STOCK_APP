@@ -18,6 +18,13 @@ export default function StockEntryPage() {
   const [restockMessage, setRestockMessage] = useState<Message | null>(null);
   const [restockSubmitting, setRestockSubmitting] = useState(false);
 
+  // Remove stock (physical count correction) form
+  const [removeProduct, setRemoveProduct] = useState("");
+  const [removeQty, setRemoveQty] = useState(1);
+  const [removeRemarks, setRemoveRemarks] = useState("");
+  const [removeMessage, setRemoveMessage] = useState<Message | null>(null);
+  const [removeSubmitting, setRemoveSubmitting] = useState(false);
+
   // GST rate form
   const [gstProduct, setGstProduct] = useState("");
   const [gstRate, setGstRate] = useState(GST_RATES[1]);
@@ -50,6 +57,7 @@ export default function StockEntryPage() {
       const list: Product[] = data.products || [];
       setProducts(list);
       setRestockProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
+      setRemoveProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
       setGstProduct((prev) => (prev && list.some((p) => p.name === prev) ? prev : list[0]?.name ?? ""));
     } catch {
       setLoadError("Failed to reach the server.");
@@ -91,6 +99,33 @@ export default function StockEntryPage() {
       await loadProducts();
     } finally {
       setRestockSubmitting(false);
+    }
+  }
+
+  async function handleRemoveStock(e: FormEvent) {
+    e.preventDefault();
+    setRemoveMessage(null);
+    setRemoveSubmitting(true);
+    try {
+      const res = await fetch("/api/stock-adjustments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product: removeProduct, qty: removeQty, remarks: removeRemarks }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRemoveMessage({ type: "error", text: data.error || "Failed to remove stock." });
+        return;
+      }
+      setRemoveMessage({
+        type: "ok",
+        text: `${removeQty} removed from ${data.product.name}. New stock: ${data.product.stock}.`,
+      });
+      setRemoveQty(1);
+      setRemoveRemarks("");
+      await loadProducts();
+    } finally {
+      setRemoveSubmitting(false);
     }
   }
 
@@ -143,6 +178,7 @@ export default function StockEntryPage() {
   }
 
   const restockCurrent = products.find((p) => p.name === restockProduct);
+  const removeCurrent = products.find((p) => p.name === removeProduct);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
@@ -217,6 +253,92 @@ export default function StockEntryPage() {
                 }`}
               >
                 {restockMessage.text}
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-sm font-semibold text-slate-900">Remove stock</h2>
+            <p className="mb-4 -mt-2 text-xs text-slate-500">
+              For correcting a physical stock count mismatch — not a sale.
+            </p>
+            {products.length === 0 ? (
+              <p className="text-sm text-slate-500">No products yet — add one first.</p>
+            ) : (
+              <form onSubmit={handleRemoveStock} className="flex flex-col gap-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="remove-product">
+                    Product
+                  </label>
+                  <select
+                    id="remove-product"
+                    value={removeProduct}
+                    onChange={(e) => setRemoveProduct(e.target.value)}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  >
+                    {products.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.name} — currently {p.stock}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="remove-qty">
+                    Quantity to remove
+                  </label>
+                  <input
+                    id="remove-qty"
+                    type="number"
+                    min={1}
+                    max={removeCurrent?.stock || undefined}
+                    value={removeQty}
+                    onChange={(e) => setRemoveQty(Number(e.target.value))}
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  />
+                  {removeCurrent && (
+                    <p className="mt-1 text-xs text-slate-500">{removeCurrent.stock} currently in stock</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="remove-remarks">
+                    Remarks <span className="text-slate-400">(required)</span>
+                  </label>
+                  <input
+                    id="remove-remarks"
+                    type="text"
+                    value={removeRemarks}
+                    onChange={(e) => setRemoveRemarks(e.target.value)}
+                    placeholder="e.g. damaged in transit, recount correction"
+                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={
+                    removeSubmitting ||
+                    !removeProduct ||
+                    removeQty < 1 ||
+                    removeQty > (removeCurrent?.stock ?? 0) ||
+                    !removeRemarks.trim()
+                  }
+                  className="rounded bg-red-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-800 disabled:opacity-50"
+                >
+                  {removeSubmitting ? "Removing…" : "Remove stock"}
+                </button>
+              </form>
+            )}
+
+            {removeMessage && (
+              <p
+                className={`mt-4 text-sm ${
+                  removeMessage.type === "ok" ? "text-emerald-600" : "text-red-600"
+                }`}
+              >
+                {removeMessage.text}
               </p>
             )}
           </section>

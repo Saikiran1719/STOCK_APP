@@ -93,3 +93,123 @@ insert into products (name, cost, stock) values
   ('KEYBOARD', 1000, 50),
   ('MONITER', 5000, 5)
 on conflict (name) do nothing;
+
+-- --------------------------------------------------------------------------
+-- Multi-item invoices. Superseded the one-product-per-order "orders" table
+-- above (left in place, unused, rather than dropped — it's not destructive
+-- to data that might already be in it). An invoice is now a header row in
+-- `invoices` plus one or more `invoice_items` line rows.
+-- --------------------------------------------------------------------------
+
+create table if not exists invoices (
+  id bigint generated always as identity primary key,
+  customer_name text,
+  subtotal numeric not null default 0,
+  gst_amount numeric not null default 0,
+  total numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists invoice_items (
+  id bigint generated always as identity primary key,
+  invoice_id bigint not null references invoices(id) on delete cascade,
+  product_id bigint references products(id),
+  product_name text not null,
+  qty integer not null,
+  unit_cost numeric not null,
+  gst_rate numeric not null,
+  subtotal numeric not null,
+  gst_amount numeric not null,
+  total numeric not null,
+  new_stock integer,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists invoice_items_invoice_id_idx on invoice_items(invoice_id);
+
+-- Takes a customer name and a JSON array of {"name": product, "qty": n},
+-- and does the whole invoice — stock checks, stock decrements, line items,
+-- and the invoice header's totals — as ONE transaction. If any item can't
+-- be fulfilled (product missing or insufficient stock), the exception
+-- aborts the whole function and every change it made this call is rolled
+-- back, so a multi-item order can never partially succeed.
+create or replace function place_invoice(p_customer_name text, p_items jsonb)
+returns table (invoice_id bigint, invoice_total numeric)
+language plpgsql
+as $$
+declare
+  v_invoice_id bigint;
+  v_item jsonb;
+  v_name text;
+  v_qty integer;
+  v_product products%rowtype;
+  v_item_subtotal numeric;
+  v_item_gst numeric;
+  v_item_total numeric;
+  v_invoice_subtotal numeric := 0;
+  v_invoice_gst numeric := 0;
+  v_invoice_total numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'no_items';
+  end if;
+
+  insert into invoices (customer_name, subtotal, gst_amount, total)
+  values (nullif(p_customer_name, ''), 0, 0, 0)
+  returning id into v_invoice_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_name := v_item->>'name';
+    v_qty := (v_item->>'qty')::integer;
+
+    if v_name is null or v_qty is null or v_qty <= 0 then
+      raise exception 'invalid_item:%', coalesce(v_name, '?');
+    end if;
+
+    select * into v_product from products where products.name = v_name for update;
+
+    if not found then
+      raise exception 'not_found:%', v_name;
+    end if;
+
+    if v_product.stock < v_qty then
+      raise exception 'insufficient_stock:%:%', v_name, v_product.stock;
+    end if;
+
+    update products set stock = products.stock - v_qty where id = v_product.id;
+
+    v_item_subtotal := v_product.cost * v_qty;
+    v_item_gst := v_item_subtotal * v_product.gst_rate / 100;
+    v_item_total := v_item_subtotal + v_item_gst;
+
+    insert into invoice_items
+      (invoice_id, product_id, product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, new_stock)
+    values
+      (v_invoice_id, v_product.id, v_product.name, v_qty, v_product.cost, v_product.gst_rate,
+       v_item_subtotal, v_item_gst, v_item_total, v_product.stock - v_qty);
+
+    v_invoice_subtotal := v_invoice_subtotal + v_item_subtotal;
+    v_invoice_gst := v_invoice_gst + v_item_gst;
+    v_invoice_total := v_invoice_total + v_item_total;
+  end loop;
+
+  update invoices
+  set subtotal = v_invoice_subtotal, gst_amount = v_invoice_gst, total = v_invoice_total
+  where id = v_invoice_id;
+
+  return query select v_invoice_id, v_invoice_total;
+end;
+$$;
+
+-- Manual stock correction (e.g. a physical count found a mismatch), logged
+-- with a required remarks note. Reuses decrement_stock for the atomic part.
+create table if not exists stock_adjustments (
+  id bigint generated always as identity primary key,
+  product_id bigint references products(id),
+  product_name text not null,
+  qty integer not null,
+  remarks text not null,
+  new_stock integer,
+  created_at timestamptz not null default now()
+);

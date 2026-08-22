@@ -6,6 +6,7 @@ import { useState } from "react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: "▦" },
+  { href: "/invoices", label: "Invoices", icon: "🧾" },
   { href: "/stock-entry", label: "Stock Entry", icon: "▤" },
   { href: "/settings", label: "Settings", icon: "⚙" },
 ];
@@ -64,7 +65,8 @@ export default function Sidebar() {
 
         <nav className="flex-1 space-y-1 px-3 py-4">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
