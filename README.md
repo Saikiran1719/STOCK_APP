@@ -1,16 +1,18 @@
 # Stock Warehouse
 
 An internal inventory console: place multi-item orders (reduces stock, generates a
-printable GST invoice), browse/reprint every invoice ever placed, and manage
-stock/products/GST rates from a dedicated screen — all backed by Supabase (Postgres).
-Password-gated, deployed on Vercel.
+printable GST invoice), track payment and void mistaken invoices, browse/reprint every
+invoice ever placed, run monthly GST/sales reports, and manage stock/products/GST rates
+from a dedicated screen — all backed by Supabase (Postgres). Password-gated, deployed on
+Vercel.
 
 ## How it works
 
 - `src/lib/db.ts` — talks to Supabase via `@supabase/supabase-js` using the service-role
   key (server-side only).
-  - `getProducts()` / `createProduct()` / `updateProductGst()` read/write the `products`
-    table.
+  - `getProducts()` / `createProduct()` / `updateProduct()` read/write the `products`
+    table (`updateProduct` sets cost and GST rate together, from Stock Entry's "Edit
+    product" form).
   - `placeInvoice()` calls the `place_invoice` Postgres function (see
     `supabase/schema.sql`), which runs a whole multi-item order — every item's stock
     check, stock decrement, and line row, plus the invoice header — as **one
@@ -18,30 +20,49 @@ Password-gated, deployed on Vercel.
     that call did, so an invoice can never partially succeed (e.g. item 1 decremented
     but item 3 out of stock). `getInvoices()` / `getInvoiceById()` read invoices back
     for the list and reprint screens.
+  - `updateInvoicePayment()` records `amount_paid` on an invoice; payment status
+    (unpaid/partial/paid) is always derived from `amount_paid` vs `total`, never stored
+    separately, so the two can't drift out of sync.
+  - `voidInvoice()` calls the `void_invoice` Postgres function — atomically restores
+    stock for every line item and marks the invoice voided, in one transaction, so a
+    void can't partially restore stock. Requires a reason; voided invoices are excluded
+    from `getReportSummary()`'s totals and can't be paid or voided again.
   - `restock()` / `removeStock()` call `increment_stock` / `decrement_stock`, the same
     atomic single-item pattern, for adding stock and for manual stock corrections
-    (`removeStock` requires remarks and logs to `stock_adjustments`).
+    (`removeStock` requires remarks and logs to `stock_adjustments`, readable via
+    `getStockAdjustments()`).
+  - `getReportSummary()` aggregates active (non-voided) invoices in a date range: total
+    sales, GST collected, amount received/outstanding, and a breakdown by GST rate slab
+    — the numbers a monthly GST return needs.
   - `getSettings()` / `saveSettings()` read/write the single-row `company_settings`
     table (company name, address, GSTIN, currency symbol, invoice footer note).
 - `src/app/api/*` — route handlers: `login`, `logout`, `products` (GET list + POST
-  create + PATCH GST rate), `restock` (POST), `stock-adjustments` (POST), `settings`
-  (GET + PUT), `order` (POST, places a multi-item invoice), `invoices` (GET list),
-  `invoices/[id]` (GET one, for the reprint page).
+  create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
+  remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice),
+  `invoices` (GET list), `invoices/[id]` (GET one + PATCH payment, for the reprint
+  page), `invoices/[id]/void` (POST), `reports` (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
 - `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
   (`src/components/Sidebar.tsx`); routes inside it:
   - `page.tsx` — **Dashboard**: KPI tiles, multi-item order builder (add products to a
-    cart, one customer name, one invoice), stock table.
+    cart, required customer name + address, one invoice), stock table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
-    date filter and a customer/product search box — find one and reprint it.
+    date filter, a customer/product search box, and a payment-status column — find one
+    and reprint it. Voided invoices show struck through with a "Voided" badge.
   - `invoices/[id]/page.tsx` — the printable invoice itself (client-rendered, fetches
     from `/api/invoices/[id]`; the sidebar and back/print controls are hidden via
     `print:` classes when actually printed — use the Print button, or the browser's own
     print dialog / Ctrl+P). Sets the page title to `Invoice No: INV-000123`, which
-    browsers use as the print header and default PDF filename.
+    browsers use as the print header and default PDF filename. Below the invoice
+    (screen only): a "Record payment" form and a "Void invoice" control (asks for a
+    reason, then restores stock). A voided invoice shows a red VOIDED banner — printed
+    too, not just on screen — instead of those controls.
+  - `reports/page.tsx` — **Reports**: pick a month, see invoice count, taxable sales,
+    GST collected, amount received/outstanding, and a per-GST-rate breakdown.
   - `stock-entry/page.tsx` — **Stock Entry**: add stock, remove stock (with required
-    remarks, for physical count corrections), update a product's GST rate, or register a
+    remarks, for physical count corrections — logged and shown in a "Recent stock
+    adjustments" table on the same page), edit a product's price/GST rate, or register a
     new product.
   - `settings/page.tsx` — **Settings**: company details used on invoices.
 - `src/app/login/page.tsx` — the password screen.
@@ -75,10 +96,11 @@ click-through, not a hosted demo.
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Open the SQL Editor and run [supabase/schema.sql](supabase/schema.sql) — creates
-   `products`, `invoices`, `invoice_items`, `stock_adjustments`, `company_settings`, the
-   `place_invoice`/`decrement_stock`/`increment_stock` functions, and seeds the three
-   original products. Every statement is idempotent, so if the schema changes later
-   (like this GST/multi-item update did), re-running the whole file is always safe —
+   `products`, `invoices` (with payment/void columns), `invoice_items`,
+   `stock_adjustments`, `company_settings`, the
+   `place_invoice`/`void_invoice`/`decrement_stock`/`increment_stock` functions, and
+   seeds the three original products. Every statement is idempotent, so if the schema
+   changes later (as it has a few times), re-running the whole file is always safe —
    existing data is untouched, only what's missing gets added.
 3. In Project Settings → API, copy the **Project URL** and the **service_role** key
    (not the anon/public key — the service role key is what lets the server write to the

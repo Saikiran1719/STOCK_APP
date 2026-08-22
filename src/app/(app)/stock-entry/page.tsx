@@ -4,6 +4,14 @@ import { useEffect, useState, type FormEvent } from "react";
 
 type Product = { id: number; name: string; cost: number; stock: number; gstRate: number };
 type Message = { type: "ok" | "error"; text: string };
+type Adjustment = {
+  id: number;
+  productName: string;
+  qty: number;
+  remarks: string;
+  newStock: number;
+  createdAt: string;
+};
 
 const GST_RATES = [5, 18];
 
@@ -39,6 +47,27 @@ export default function StockEntryPage() {
   const [newGstRate, setNewGstRate] = useState(GST_RATES[1]);
   const [newMessage, setNewMessage] = useState<Message | null>(null);
   const [newSubmitting, setNewSubmitting] = useState(false);
+
+  // Recent stock adjustment history
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  const [adjustmentsLoading, setAdjustmentsLoading] = useState(true);
+
+  async function loadAdjustments() {
+    setAdjustmentsLoading(true);
+    try {
+      const res = await fetch("/api/stock-adjustments");
+      if (res.ok) {
+        const data = await res.json();
+        setAdjustments(data.adjustments || []);
+      }
+    } finally {
+      setAdjustmentsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAdjustments();
+  }, []);
 
   async function loadProducts() {
     setLoading(true);
@@ -127,7 +156,7 @@ export default function StockEntryPage() {
       });
       setRemoveQty(1);
       setRemoveRemarks("");
-      await loadProducts();
+      await Promise.all([loadProducts(), loadAdjustments()]);
     } finally {
       setRemoveSubmitting(false);
     }
@@ -511,6 +540,51 @@ export default function StockEntryPage() {
           </section>
         </div>
       )}
+
+      <section className="mt-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-900">Recent stock adjustments</h2>
+          <p className="text-xs text-slate-500">Every manual stock correction, with its remarks.</p>
+        </div>
+        {adjustmentsLoading ? (
+          <p className="px-5 py-6 text-sm text-slate-500">Loading…</p>
+        ) : adjustments.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-slate-500">No stock corrections logged yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <th className="whitespace-nowrap px-5 py-3">Date</th>
+                  <th className="whitespace-nowrap px-5 py-3">Product</th>
+                  <th className="whitespace-nowrap px-5 py-3">Qty removed</th>
+                  <th className="whitespace-nowrap px-5 py-3">New stock</th>
+                  <th className="px-5 py-3">Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adjustments.map((a) => (
+                  <tr key={a.id} className="border-b border-gray-50 last:border-0">
+                    <td className="whitespace-nowrap px-5 py-3 text-slate-600">
+                      {new Date(a.createdAt).toLocaleString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">{a.productName}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-red-600">-{a.qty}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-slate-600">{a.newStock}</td>
+                    <td className="px-5 py-3 text-slate-600">{a.remarks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

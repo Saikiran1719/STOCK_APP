@@ -229,3 +229,50 @@ create table if not exists stock_adjustments (
   new_stock integer,
   created_at timestamptz not null default now()
 );
+
+-- --------------------------------------------------------------------------
+-- Payment tracking + void support.
+-- --------------------------------------------------------------------------
+
+-- Payment status is derived from amount_paid vs total (unpaid/partial/paid)
+-- rather than stored separately, so the two can never fall out of sync.
+alter table invoices add column if not exists amount_paid numeric not null default 0;
+
+-- Voiding restores stock instead of deleting the invoice, so there's always
+-- a record of what happened. 'active' is the only status place_invoice()
+-- creates; 'voided' is set only by void_invoice() below.
+alter table invoices add column if not exists status text not null default 'active';
+alter table invoices add column if not exists voided_at timestamptz;
+alter table invoices add column if not exists void_reason text;
+
+-- Atomically restores stock for every line item and marks the invoice
+-- voided, in one transaction — a partial restore can't happen.
+create or replace function void_invoice(p_invoice_id bigint, p_reason text)
+returns void
+language plpgsql
+as $$
+declare
+  v_status text;
+  v_item record;
+begin
+  select status into v_status from invoices where id = p_invoice_id for update;
+
+  if not found then
+    raise exception 'invoice_not_found';
+  end if;
+  if v_status = 'voided' then
+    raise exception 'already_voided';
+  end if;
+
+  for v_item in select product_id, qty from invoice_items where invoice_id = p_invoice_id
+  loop
+    if v_item.product_id is not null then
+      update products set stock = stock + v_item.qty where id = v_item.product_id;
+    end if;
+  end loop;
+
+  update invoices
+  set status = 'voided', voided_at = now(), void_reason = p_reason
+  where id = p_invoice_id;
+end;
+$$;

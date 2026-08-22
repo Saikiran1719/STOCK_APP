@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+type PaymentStatus = "unpaid" | "partial" | "paid";
+type InvoiceStatus = "active" | "voided";
+
 type Invoice = {
   id: number;
   customerName: string;
@@ -11,6 +14,9 @@ type Invoice = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  amountPaid: number;
+  paymentStatus: PaymentStatus;
+  status: InvoiceStatus;
   createdAt: string;
 };
 
@@ -77,7 +83,9 @@ export default function InvoicesPage() {
     });
   }, [invoices, dateFilter, search]);
 
-  const filteredTotal = filtered.reduce((sum, inv) => sum + inv.total, 0);
+  const filteredTotal = filtered
+    .filter((inv) => inv.status === "active")
+    .reduce((sum, inv) => sum + inv.total, 0);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
@@ -156,37 +164,55 @@ export default function InvoicesPage() {
                       <th className="whitespace-nowrap px-5 py-3">Customer</th>
                       <th className="px-5 py-3">Items</th>
                       <th className="whitespace-nowrap px-5 py-3">Total</th>
+                      <th className="whitespace-nowrap px-5 py-3">Payment</th>
                       <th className="whitespace-nowrap px-5 py-3" />
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((inv) => (
-                      <tr key={inv.id} className="border-b border-gray-50 last:border-0">
-                        <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">
-                          {invoiceNumberFor(inv.id)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">
-                          {new Date(inv.createdAt).toLocaleDateString(undefined, {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-600">
-                          {inv.customerName || "Cash / Walk-in"}
-                        </td>
-                        <td className="max-w-xs px-5 py-3 text-slate-600">{inv.itemsLabel}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-slate-900">
-                          {currency}
-                          {inv.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3">
-                          <Link href={`/invoices/${inv.id}`} className="font-medium text-blue-700 hover:underline">
-                            View / Print
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
+                    {filtered.map((inv) => {
+                      const voided = inv.status === "voided";
+                      return (
+                        <tr
+                          key={inv.id}
+                          className={`border-b border-gray-50 last:border-0 ${voided ? "opacity-50" : ""}`}
+                        >
+                          <td className="whitespace-nowrap px-5 py-3 font-medium text-slate-900">
+                            <span className={voided ? "line-through" : ""}>{invoiceNumberFor(inv.id)}</span>
+                            {voided && (
+                              <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                                Voided
+                              </span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-5 py-3 text-slate-600">
+                            {new Date(inv.createdAt).toLocaleDateString(undefined, {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-5 py-3 text-slate-600">
+                            {inv.customerName || "Cash / Walk-in"}
+                          </td>
+                          <td className="max-w-xs px-5 py-3 text-slate-600">{inv.itemsLabel}</td>
+                          <td className="whitespace-nowrap px-5 py-3 text-slate-900">
+                            {currency}
+                            {inv.total.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="whitespace-nowrap px-5 py-3">
+                            {!voided && <PaymentPill status={inv.paymentStatus} />}
+                          </td>
+                          <td className="whitespace-nowrap px-5 py-3">
+                            <Link href={`/invoices/${inv.id}`} className="font-medium text-blue-700 hover:underline">
+                              View / Print
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -195,5 +221,27 @@ export default function InvoicesPage() {
         </>
       )}
     </main>
+  );
+}
+
+function PaymentPill({ status }: { status: PaymentStatus }) {
+  if (status === "paid") {
+    return (
+      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        Paid
+      </span>
+    );
+  }
+  if (status === "partial") {
+    return (
+      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+        Partial
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+      Unpaid
+    </span>
   );
 }

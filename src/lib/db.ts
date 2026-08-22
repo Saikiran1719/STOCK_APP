@@ -33,6 +33,9 @@ export type InvoiceItem = {
   total: number;
 };
 
+export type PaymentStatus = "unpaid" | "partial" | "paid";
+export type InvoiceStatus = "active" | "voided";
+
 export type InvoiceSummary = {
   id: number;
   customerName: string;
@@ -41,6 +44,9 @@ export type InvoiceSummary = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  amountPaid: number;
+  paymentStatus: PaymentStatus;
+  status: InvoiceStatus;
   createdAt: string;
 };
 
@@ -51,8 +57,38 @@ export type InvoiceDetail = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  amountPaid: number;
+  paymentStatus: PaymentStatus;
+  status: InvoiceStatus;
+  voidReason: string | null;
   createdAt: string;
   items: InvoiceItem[];
+};
+
+export type StockAdjustmentRecord = {
+  id: number;
+  productName: string;
+  qty: number;
+  remarks: string;
+  newStock: number;
+  createdAt: string;
+};
+
+export type GstRateBreakdown = {
+  gstRate: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+};
+
+export type ReportSummary = {
+  invoiceCount: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+  amountPaid: number;
+  amountOutstanding: number;
+  byGstRate: GstRateBreakdown[];
 };
 
 export type PlaceInvoiceResult =
@@ -60,6 +96,18 @@ export type PlaceInvoiceResult =
   | { ok: false; error: string };
 
 export type ProductResult = { ok: true; product: Product } | { ok: false; error: string };
+
+export type SimpleResult = { ok: true } | { ok: false; error: string };
+
+export type PaymentUpdateResult =
+  | { ok: true; amountPaid: number; paymentStatus: PaymentStatus }
+  | { ok: false; error: string };
+
+function derivePaymentStatus(total: number, amountPaid: number): PaymentStatus {
+  if (amountPaid <= 0) return "unpaid";
+  if (amountPaid >= total) return "paid";
+  return "partial";
+}
 
 const DEFAULT_SETTINGS: Settings = {
   companyName: "",
@@ -94,8 +142,10 @@ let demoProducts: Product[] = [
   { id: 3, name: "MONITER", cost: 5000, stock: 5, gstRate: 18 },
 ];
 let demoInvoices: InvoiceDetail[] = [];
+let demoStockAdjustments: StockAdjustmentRecord[] = [];
 let demoNextProductId = 4;
 let demoNextInvoiceId = 1;
+let demoNextAdjustmentId = 1;
 let demoSettings: Settings = { ...DEFAULT_SETTINGS };
 
 function getDemoProducts(): Product[] {
@@ -174,6 +224,10 @@ function placeDemoInvoice(
     subtotal,
     gstAmount,
     total,
+    amountPaid: 0,
+    paymentStatus: "unpaid",
+    status: "active",
+    voidReason: null,
     createdAt: new Date().toISOString(),
     items: invoiceItems,
   };
@@ -194,6 +248,9 @@ function getDemoInvoices(): InvoiceSummary[] {
       subtotal: inv.subtotal,
       gstAmount: inv.gstAmount,
       total: inv.total,
+      amountPaid: inv.amountPaid,
+      paymentStatus: inv.paymentStatus,
+      status: inv.status,
       createdAt: inv.createdAt,
     }));
 }
@@ -201,6 +258,79 @@ function getDemoInvoices(): InvoiceSummary[] {
 function getDemoInvoiceById(id: number): InvoiceDetail | null {
   const invoice = demoInvoices.find((inv) => inv.id === id);
   return invoice ? { ...invoice, items: invoice.items.map((it) => ({ ...it })) } : null;
+}
+
+function updateDemoInvoicePayment(id: number, amountPaid: number): PaymentUpdateResult {
+  const invoice = demoInvoices.find((inv) => inv.id === id);
+  if (!invoice) return { ok: false, error: "Invoice not found." };
+  if (invoice.status === "voided") {
+    return { ok: false, error: "Cannot record payment on a voided invoice." };
+  }
+  const clamped = Math.max(0, Math.min(amountPaid, invoice.total));
+  invoice.amountPaid = clamped;
+  invoice.paymentStatus = derivePaymentStatus(invoice.total, clamped);
+  return { ok: true, amountPaid: clamped, paymentStatus: invoice.paymentStatus };
+}
+
+function voidDemoInvoice(id: number, reason: string): SimpleResult {
+  const invoice = demoInvoices.find((inv) => inv.id === id);
+  if (!invoice) return { ok: false, error: "Invoice not found." };
+  if (invoice.status === "voided") return { ok: false, error: "This invoice is already voided." };
+
+  for (const item of invoice.items) {
+    const product = demoProducts.find((p) => p.name === item.productName);
+    if (product) product.stock += item.qty;
+  }
+
+  invoice.status = "voided";
+  invoice.voidReason = reason;
+  return { ok: true };
+}
+
+function getDemoStockAdjustments(): StockAdjustmentRecord[] {
+  return demoStockAdjustments.slice().reverse();
+}
+
+function getDemoReportSummary(fromISO: string, toISO: string): ReportSummary {
+  const inRange = demoInvoices.filter(
+    (inv) => inv.status === "active" && inv.createdAt >= fromISO && inv.createdAt <= toISO
+  );
+
+  const byRate = new Map<number, GstRateBreakdown>();
+  let subtotal = 0;
+  let gstAmount = 0;
+  let total = 0;
+  let amountPaid = 0;
+
+  for (const inv of inRange) {
+    subtotal += inv.subtotal;
+    gstAmount += inv.gstAmount;
+    total += inv.total;
+    amountPaid += inv.amountPaid;
+
+    for (const item of inv.items) {
+      const bucket = byRate.get(item.gstRate) ?? {
+        gstRate: item.gstRate,
+        subtotal: 0,
+        gstAmount: 0,
+        total: 0,
+      };
+      bucket.subtotal += item.subtotal;
+      bucket.gstAmount += item.gstAmount;
+      bucket.total += item.total;
+      byRate.set(item.gstRate, bucket);
+    }
+  }
+
+  return {
+    invoiceCount: inRange.length,
+    subtotal,
+    gstAmount,
+    total,
+    amountPaid,
+    amountOutstanding: total - amountPaid,
+    byGstRate: Array.from(byRate.values()).sort((a, b) => a.gstRate - b.gstRate),
+  };
 }
 
 function createDemoProduct(
@@ -227,7 +357,7 @@ function restockDemo(name: string, qty: number): ProductResult {
   return { ok: true, product: { ...product } };
 }
 
-function removeDemoStock(name: string, qty: number): ProductResult {
+function removeDemoStock(name: string, qty: number, remarks: string): ProductResult {
   const product = demoProducts.find((p) => p.name.toLowerCase() === name.toLowerCase());
   if (!product) {
     return { ok: false, error: `Product "${name}" was not found.` };
@@ -236,6 +366,14 @@ function removeDemoStock(name: string, qty: number): ProductResult {
     return { ok: false, error: `Only ${product.stock} of ${product.name} in stock.` };
   }
   product.stock -= qty;
+  demoStockAdjustments.push({
+    id: demoNextAdjustmentId++,
+    productName: product.name,
+    qty,
+    remarks,
+    newStock: product.stock,
+    createdAt: new Date().toISOString(),
+  });
   return { ok: true, product: { ...product } };
 }
 
@@ -391,7 +529,7 @@ export async function removeStock(
   }
 
   if (isDemoMode()) {
-    return removeDemoStock(name, qty);
+    return removeDemoStock(name, qty, cleanRemarks);
   }
 
   const supabase = getClient();
@@ -518,24 +656,31 @@ export async function getInvoices(): Promise<InvoiceSummary[]> {
   const { data, error } = await getClient()
     .from("invoices")
     .select(
-      "id, customer_name, customer_address, subtotal, gst_amount, total, created_at, invoice_items(product_name, qty)"
+      "id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, created_at, invoice_items(product_name, qty)"
     )
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  return (data ?? []).map((inv) => ({
-    id: inv.id,
-    customerName: inv.customer_name ?? "",
-    customerAddress: inv.customer_address ?? "",
-    itemsLabel: ((inv.invoice_items ?? []) as { product_name: string; qty: number }[])
-      .map((it) => `${it.product_name} x${it.qty}`)
-      .join(", "),
-    subtotal: Number(inv.subtotal),
-    gstAmount: Number(inv.gst_amount),
-    total: Number(inv.total),
-    createdAt: inv.created_at,
-  }));
+  return (data ?? []).map((inv) => {
+    const total = Number(inv.total);
+    const amountPaid = Number(inv.amount_paid ?? 0);
+    return {
+      id: inv.id,
+      customerName: inv.customer_name ?? "",
+      customerAddress: inv.customer_address ?? "",
+      itemsLabel: ((inv.invoice_items ?? []) as { product_name: string; qty: number }[])
+        .map((it) => `${it.product_name} x${it.qty}`)
+        .join(", "),
+      subtotal: Number(inv.subtotal),
+      gstAmount: Number(inv.gst_amount),
+      total,
+      amountPaid,
+      paymentStatus: derivePaymentStatus(total, amountPaid),
+      status: (inv.status ?? "active") as InvoiceStatus,
+      createdAt: inv.created_at,
+    };
+  });
 }
 
 export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> {
@@ -546,7 +691,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
   const { data, error } = await getClient()
     .from("invoices")
     .select(
-      "id, customer_name, customer_address, subtotal, gst_amount, total, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+      "id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -564,13 +709,20 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
     total: unknown;
   };
 
+  const total = Number(data.total);
+  const amountPaid = Number(data.amount_paid ?? 0);
+
   return {
     id: data.id,
     customerName: data.customer_name ?? "",
     customerAddress: data.customer_address ?? "",
     subtotal: Number(data.subtotal),
     gstAmount: Number(data.gst_amount),
-    total: Number(data.total),
+    total,
+    amountPaid,
+    paymentStatus: derivePaymentStatus(total, amountPaid),
+    status: (data.status ?? "active") as InvoiceStatus,
+    voidReason: data.void_reason ?? null,
     createdAt: data.created_at,
     items: ((data.invoice_items ?? []) as ItemRow[]).map((it) => ({
       productName: it.product_name,
@@ -581,6 +733,150 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
       gstAmount: Number(it.gst_amount),
       total: Number(it.total),
     })),
+  };
+}
+
+/** Records a (possibly partial) payment against an invoice. */
+export async function updateInvoicePayment(
+  id: number,
+  amountPaid: number
+): Promise<PaymentUpdateResult> {
+  if (!Number.isFinite(amountPaid) || amountPaid < 0) {
+    return { ok: false, error: "Amount paid must be 0 or more." };
+  }
+
+  if (isDemoMode()) {
+    return updateDemoInvoicePayment(id, amountPaid);
+  }
+
+  const supabase = getClient();
+  const { data: invoiceRow, error: fetchError } = await supabase
+    .from("invoices")
+    .select("total, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!invoiceRow) return { ok: false, error: "Invoice not found." };
+  if (invoiceRow.status === "voided") {
+    return { ok: false, error: "Cannot record payment on a voided invoice." };
+  }
+
+  const total = Number(invoiceRow.total);
+  const clamped = Math.max(0, Math.min(amountPaid, total));
+
+  const { error } = await supabase.from("invoices").update({ amount_paid: clamped }).eq("id", id);
+  if (error) throw error;
+
+  return { ok: true, amountPaid: clamped, paymentStatus: derivePaymentStatus(total, clamped) };
+}
+
+/**
+ * Voids an invoice: restores stock for every line item and marks it voided,
+ * atomically (see void_invoice in supabase/schema.sql). Requires a reason.
+ */
+export async function voidInvoice(id: number, reason: string): Promise<SimpleResult> {
+  const cleanReason = reason.trim();
+  if (!cleanReason) {
+    return { ok: false, error: "A reason is required to void an invoice." };
+  }
+
+  if (isDemoMode()) {
+    return voidDemoInvoice(id, cleanReason);
+  }
+
+  const { error } = await getClient().rpc("void_invoice", {
+    p_invoice_id: id,
+    p_reason: cleanReason,
+  });
+
+  if (error) {
+    if (error.message.includes("invoice_not_found")) {
+      return { ok: false, error: "Invoice not found." };
+    }
+    if (error.message.includes("already_voided")) {
+      return { ok: false, error: "This invoice is already voided." };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
+/** Recent manual stock corrections, newest first — for the Stock Entry audit log. */
+export async function getStockAdjustments(): Promise<StockAdjustmentRecord[]> {
+  if (isDemoMode()) {
+    return getDemoStockAdjustments();
+  }
+
+  const { data, error } = await getClient()
+    .from("stock_adjustments")
+    .select("id, product_name, qty, remarks, new_stock, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) throw error;
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    productName: r.product_name,
+    qty: r.qty,
+    remarks: r.remarks,
+    newStock: r.new_stock,
+    createdAt: r.created_at,
+  }));
+}
+
+/** Sales/GST summary for invoices created within [fromISO, toISO]. Excludes voided invoices. */
+export async function getReportSummary(fromISO: string, toISO: string): Promise<ReportSummary> {
+  if (isDemoMode()) {
+    return getDemoReportSummary(fromISO, toISO);
+  }
+
+  const { data, error } = await getClient()
+    .from("invoices")
+    .select(
+      "subtotal, gst_amount, total, amount_paid, invoice_items(gst_rate, subtotal, gst_amount, total)"
+    )
+    .eq("status", "active")
+    .gte("created_at", fromISO)
+    .lte("created_at", toISO);
+
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const byRate = new Map<number, GstRateBreakdown>();
+  let subtotal = 0;
+  let gstAmount = 0;
+  let total = 0;
+  let amountPaid = 0;
+
+  type ItemRow = { gst_rate: unknown; subtotal: unknown; gst_amount: unknown; total: unknown };
+
+  for (const inv of rows) {
+    subtotal += Number(inv.subtotal);
+    gstAmount += Number(inv.gst_amount);
+    total += Number(inv.total);
+    amountPaid += Number(inv.amount_paid ?? 0);
+
+    for (const item of (inv.invoice_items ?? []) as ItemRow[]) {
+      const rate = Number(item.gst_rate);
+      const bucket = byRate.get(rate) ?? { gstRate: rate, subtotal: 0, gstAmount: 0, total: 0 };
+      bucket.subtotal += Number(item.subtotal);
+      bucket.gstAmount += Number(item.gst_amount);
+      bucket.total += Number(item.total);
+      byRate.set(rate, bucket);
+    }
+  }
+
+  return {
+    invoiceCount: rows.length,
+    subtotal,
+    gstAmount,
+    total,
+    amountPaid,
+    amountOutstanding: total - amountPaid,
+    byGstRate: Array.from(byRate.values()).sort((a, b) => a.gstRate - b.gstRate),
   };
 }
 
