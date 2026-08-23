@@ -81,7 +81,12 @@ Vercel.
     status, in a searchable bordered/striped table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
     date filter, a customer/product search box, and a payment-status column — find one
-    and reprint it. Voided invoices show struck through with a "Voided" badge.
+    and reprint it. Voided invoices show struck through with a "Voided" badge. An
+    "Export to Excel" button downloads whatever's currently filtered as a CSV (invoice
+    number, date, customer, address, items, subtotal/GST/total/paid/balance, payment and
+    void status) — built client-side from the data already on screen, no extra API call.
+    A UTF-8 BOM is prepended so Excel renders ₹ and non-ASCII names correctly instead of
+    as mojibake.
   - `invoices/[id]/page.tsx` — the printable invoice itself (client-rendered, fetches
     from `/api/invoices/[id]`; the sidebar and back/print controls are hidden via
     `print:` classes when actually printed — use the Print button, or the browser's own

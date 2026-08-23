@@ -87,6 +87,63 @@ export default function InvoicesPage() {
     .filter((inv) => inv.status === "active")
     .reduce((sum, inv) => sum + inv.total, 0);
 
+  function handleExportExcel() {
+    const header = [
+      "Invoice No",
+      "Date",
+      "Customer",
+      "Address",
+      "Items",
+      "Subtotal",
+      "GST Amount",
+      "Total",
+      "Amount Paid",
+      "Balance Due",
+      "Payment Status",
+      "Invoice Status",
+    ];
+    const rows = filtered.map((inv) => {
+      const voided = inv.status === "voided";
+      return [
+        invoiceNumberFor(inv.id),
+        new Date(inv.createdAt).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }),
+        inv.customerName || "Cash / Walk-in",
+        inv.customerAddress,
+        inv.itemsLabel,
+        inv.subtotal.toFixed(2),
+        inv.gstAmount.toFixed(2),
+        inv.total.toFixed(2),
+        inv.amountPaid.toFixed(2),
+        Math.max(0, inv.total - inv.amountPaid).toFixed(2),
+        voided ? "-" : inv.paymentStatus,
+        voided ? "Voided" : "Active",
+      ];
+    });
+
+    const csvCell = (value: string) => {
+      const s = String(value ?? "");
+      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+
+    // A UTF-8 BOM so Excel reads the ₹ symbol and any non-ASCII customer
+    // names correctly instead of showing mojibake.
+    const bom = String.fromCharCode(0xfeff);
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CounterBook-Invoices-${toDateInputValue(new Date().toISOString())}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6">
@@ -141,14 +198,24 @@ export default function InvoicesPage() {
           </div>
 
           <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <h2 className="text-sm font-semibold text-ink">
                 {filtered.length} invoice{filtered.length === 1 ? "" : "s"}
               </h2>
-              <p className="text-sm text-muted">
-                Total: {currency}
-                {filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </p>
+              <div className="flex items-center gap-4">
+                <p className="text-sm text-muted">
+                  Total: {currency}
+                  {filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleExportExcel}
+                  disabled={filtered.length === 0}
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-accent disabled:opacity-45"
+                >
+                  ↓ Export to Excel
+                </button>
+              </div>
             </div>
 
             {filtered.length === 0 ? (
