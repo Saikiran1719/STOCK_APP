@@ -39,6 +39,8 @@ export default function InvoicesPage() {
   const [loadError, setLoadError] = useState("");
   const [dateFilter, setDateFilter] = useState(""); // "" = all dates
   const [search, setSearch] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -87,61 +89,34 @@ export default function InvoicesPage() {
     .filter((inv) => inv.status === "active")
     .reduce((sum, inv) => sum + inv.total, 0);
 
-  function handleExportExcel() {
-    const header = [
-      "Invoice No",
-      "Date",
-      "Customer",
-      "Address",
-      "Items",
-      "Subtotal",
-      "GST Amount",
-      "Total",
-      "Amount Paid",
-      "Balance Due",
-      "Payment Status",
-      "Invoice Status",
-    ];
-    const rows = filtered.map((inv) => {
-      const voided = inv.status === "voided";
-      return [
-        invoiceNumberFor(inv.id),
-        new Date(inv.createdAt).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        }),
-        inv.customerName || "Cash / Walk-in",
-        inv.customerAddress,
-        inv.itemsLabel,
-        inv.subtotal.toFixed(2),
-        inv.gstAmount.toFixed(2),
-        inv.total.toFixed(2),
-        inv.amountPaid.toFixed(2),
-        Math.max(0, inv.total - inv.amountPaid).toFixed(2),
-        voided ? "-" : inv.paymentStatus,
-        voided ? "Voided" : "Active",
-      ];
-    });
-
-    const csvCell = (value: string) => {
-      const s = String(value ?? "");
-      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
-
-    // A UTF-8 BOM so Excel reads the ₹ symbol and any non-ASCII customer
-    // names correctly instead of showing mojibake.
-    const bom = String.fromCharCode(0xfeff);
-    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `CounterBook-Invoices-${toDateInputValue(new Date().toISOString())}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  async function handleExportExcel() {
+    setExportError("");
+    setExporting(true);
+    try {
+      const res = await fetch("/api/invoices/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoices: filtered }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setExportError(data.error || "Failed to generate the Excel file.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `CounterBook-Invoices-${toDateInputValue(new Date().toISOString())}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError("Failed to reach the server.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -210,13 +185,17 @@ export default function InvoicesPage() {
                 <button
                   type="button"
                   onClick={handleExportExcel}
-                  disabled={filtered.length === 0}
+                  disabled={filtered.length === 0 || exporting}
                   className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-accent disabled:opacity-45"
                 >
-                  ↓ Export to Excel
+                  {exporting ? "Exporting…" : "↓ Export to Excel"}
                 </button>
               </div>
             </div>
+
+            {exportError && (
+              <p className="border-b border-border px-5 py-2 text-xs text-err">{exportError}</p>
+            )}
 
             {filtered.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-muted">

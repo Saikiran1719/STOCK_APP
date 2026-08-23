@@ -68,7 +68,8 @@ Vercel.
   create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
   remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice),
   `invoices` (GET list), `invoices/[id]` (GET one + PATCH payment, for the reprint
-  page), `invoices/[id]/void` (POST), `reports` (GET, `?month=YYYY-MM`).
+  page), `invoices/[id]/void` (POST), `invoices/export` (POST, builds and streams back an
+  `.xlsx` file), `reports` (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
 - `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
@@ -82,11 +83,13 @@ Vercel.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
     date filter, a customer/product search box, and a payment-status column — find one
     and reprint it. Voided invoices show struck through with a "Voided" badge. An
-    "Export to Excel" button downloads whatever's currently filtered as a CSV (invoice
-    number, date, customer, address, items, subtotal/GST/total/paid/balance, payment and
-    void status) — built client-side from the data already on screen, no extra API call.
-    A UTF-8 BOM is prepended so Excel renders ₹ and non-ASCII names correctly instead of
-    as mojibake.
+    "Export to Excel" button posts whatever's currently filtered to
+    `POST /api/invoices/export`, which uses `exceljs` to build a real `.xlsx` file —
+    bold/shaded header row, borders on every cell, columns auto-fit to their content, and
+    the header row frozen so it stays put while scrolling (the equivalent of Excel's own
+    Alt H,B,A / Alt H,O,I / Alt W,F,R) — and streams it back for download. Money columns
+    are real numbers with a `#,##0.00` format, not text, so totals sum correctly once
+    opened.
   - `invoices/[id]/page.tsx` — the printable invoice itself (client-rendered, fetches
     from `/api/invoices/[id]`; the sidebar and back/print controls are hidden via
     `print:` classes when actually printed — use the Print button, or the browser's own
