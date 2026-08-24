@@ -418,3 +418,183 @@ begin
   return query select v_invoice_id, v_invoice_total;
 end;
 $$;
+
+
+-- --------------------------------------------------------------------------
+-- Purchases: vendor bills that do a proper stock-in (with a vendor and a
+-- real cost on record) instead of Stock Entry's bare quantity bump. Vendors
+-- are parties with type = 'vendor', reusing the same customer master —
+-- that's exactly what the `type` column on `parties` was added for.
+--
+-- Deliberately never touches products.cost (the selling price set from
+-- Stock Entry's "Edit product" form) — purchase cost and selling price are
+-- two different numbers and this app keeps them that way rather than
+-- silently overwriting one from the other.
+-- --------------------------------------------------------------------------
+
+create table if not exists purchases (
+  id bigint generated always as identity primary key,
+  party_id bigint references parties(id),
+  vendor_name text not null,
+  vendor_ref text not null default '',
+  subtotal numeric not null default 0,
+  gst_amount numeric not null default 0,
+  total numeric not null default 0,
+  amount_paid numeric not null default 0,
+  status text not null default 'active',
+  voided_at timestamptz,
+  void_reason text,
+  created_at timestamptz not null default now(),
+  constraint purchases_status_check check (status in ('active', 'voided'))
+);
+
+create table if not exists purchase_items (
+  id bigint generated always as identity primary key,
+  purchase_id bigint not null references purchases(id) on delete cascade,
+  product_id bigint references products(id),
+  product_name text not null,
+  qty integer not null,
+  unit_cost numeric not null,
+  gst_rate numeric not null,
+  subtotal numeric not null,
+  gst_amount numeric not null,
+  total numeric not null,
+  new_stock integer,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists purchase_items_purchase_id_idx on purchase_items(purchase_id);
+create index if not exists purchases_party_id_idx on purchases(party_id);
+
+-- Records a vendor bill and stocks in every item, atomically, in one
+-- transaction — the purchase-side mirror of place_invoice(). p_party_id
+-- works the same way: pass one to bill against a vendor picked from a
+-- dropdown, or omit it and the function resolves/creates a vendor party by
+-- exact case-insensitive name match, same auto-build-the-master behavior as
+-- sales already have for customers.
+create or replace function record_purchase(
+  p_vendor_name text,
+  p_vendor_ref text,
+  p_items jsonb,
+  p_party_id bigint default null
+)
+returns table (purchase_id bigint, purchase_total numeric)
+language plpgsql
+as $$
+declare
+  v_purchase_id bigint;
+  v_party_id bigint;
+  v_item jsonb;
+  v_name text;
+  v_qty integer;
+  v_unit_cost numeric;
+  v_product products%rowtype;
+  v_item_subtotal numeric;
+  v_item_gst numeric;
+  v_item_total numeric;
+  v_purchase_subtotal numeric := 0;
+  v_purchase_gst numeric := 0;
+  v_purchase_total numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'no_items';
+  end if;
+
+  if p_vendor_name is null or btrim(p_vendor_name) = '' then
+    raise exception 'vendor_name_required';
+  end if;
+
+  if p_party_id is not null then
+    v_party_id := p_party_id;
+  else
+    select id into v_party_id from parties
+      where type = 'vendor' and lower(name) = lower(btrim(p_vendor_name))
+      limit 1;
+    if not found then
+      insert into parties (type, name)
+      values ('vendor', btrim(p_vendor_name))
+      returning id into v_party_id;
+    end if;
+  end if;
+
+  insert into purchases (party_id, vendor_name, vendor_ref, subtotal, gst_amount, total)
+  values (v_party_id, btrim(p_vendor_name), coalesce(btrim(p_vendor_ref), ''), 0, 0, 0)
+  returning id into v_purchase_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_name := v_item->>'name';
+    v_qty := (v_item->>'qty')::integer;
+    v_unit_cost := (v_item->>'unitCost')::numeric;
+
+    if v_name is null or v_qty is null or v_qty <= 0 then
+      raise exception 'invalid_item:%', coalesce(v_name, '?');
+    end if;
+    if v_unit_cost is null or v_unit_cost < 0 then
+      raise exception 'invalid_cost:%', v_name;
+    end if;
+
+    select * into v_product from products where products.name = v_name for update;
+
+    if not found then
+      raise exception 'not_found:%', v_name;
+    end if;
+
+    update products set stock = products.stock + v_qty where id = v_product.id;
+
+    v_item_subtotal := v_unit_cost * v_qty;
+    v_item_gst := v_item_subtotal * v_product.gst_rate / 100;
+    v_item_total := v_item_subtotal + v_item_gst;
+
+    insert into purchase_items
+      (purchase_id, product_id, product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, new_stock)
+    values
+      (v_purchase_id, v_product.id, v_product.name, v_qty, v_unit_cost, v_product.gst_rate,
+       v_item_subtotal, v_item_gst, v_item_total, v_product.stock + v_qty);
+
+    v_purchase_subtotal := v_purchase_subtotal + v_item_subtotal;
+    v_purchase_gst := v_purchase_gst + v_item_gst;
+    v_purchase_total := v_purchase_total + v_item_total;
+  end loop;
+
+  update purchases
+  set subtotal = v_purchase_subtotal, gst_amount = v_purchase_gst, total = v_purchase_total
+  where id = v_purchase_id;
+
+  return query select v_purchase_id, v_purchase_total;
+end;
+$$;
+
+-- Atomically reverses stock for every line item and marks the purchase
+-- voided — for a wrongly-entered vendor bill. Uses greatest(0, ...) rather
+-- than letting stock go negative, in case some of that purchased stock has
+-- already been sold on by the time the mistake is caught.
+create or replace function void_purchase(p_purchase_id bigint, p_reason text)
+returns void
+language plpgsql
+as $$
+declare
+  v_status text;
+  v_item record;
+begin
+  select status into v_status from purchases where id = p_purchase_id for update;
+
+  if not found then
+    raise exception 'purchase_not_found';
+  end if;
+  if v_status = 'voided' then
+    raise exception 'already_voided';
+  end if;
+
+  for v_item in select product_id, qty from purchase_items where purchase_id = p_purchase_id
+  loop
+    if v_item.product_id is not null then
+      update products set stock = greatest(0, stock - v_item.qty) where id = v_item.product_id;
+    end if;
+  end loop;
+
+  update purchases
+  set status = 'voided', voided_at = now(), void_reason = p_reason
+  where id = p_purchase_id;
+end;
+$$;

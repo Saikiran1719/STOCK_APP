@@ -5,10 +5,12 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 
 type PaymentStatus = "unpaid" | "partial" | "paid";
-type InvoiceStatus = "active" | "voided";
+type TxStatus = "active" | "voided";
+type PartyType = "customer" | "vendor";
 
 type Party = {
   id: number;
+  type: PartyType;
   name: string;
   address: string;
   phone: string;
@@ -22,7 +24,18 @@ type Invoice = {
   total: number;
   amountPaid: number;
   paymentStatus: PaymentStatus;
-  status: InvoiceStatus;
+  status: TxStatus;
+  createdAt: string;
+};
+
+type Purchase = {
+  id: number;
+  vendorRef: string;
+  itemsLabel: string;
+  total: number;
+  amountPaid: number;
+  paymentStatus: PaymentStatus;
+  status: TxStatus;
   createdAt: string;
 };
 
@@ -32,10 +45,15 @@ function invoiceNumberFor(id: number) {
   return `INV-${String(id).padStart(6, "0")}`;
 }
 
+function purchaseNumberFor(id: number) {
+  return `PUR-${String(id).padStart(6, "0")}`;
+}
+
 export default function PartyDetailPage() {
   const params = useParams<{ id: string }>();
   const [party, setParty] = useState<Party | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [currency, setCurrency] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -68,6 +86,7 @@ export default function PartyDetailPage() {
       }
       setParty(data.party);
       setInvoices(data.invoices || []);
+      setPurchases(data.purchases || []);
       setName(data.party.name);
       setAddress(data.party.address);
       setPhone(data.party.phone);
@@ -133,9 +152,12 @@ export default function PartyDetailPage() {
     );
   }
 
-  const activeInvoices = invoices.filter((inv) => inv.status === "active");
-  const totalBilled = activeInvoices.reduce((sum, inv) => sum + inv.total, 0);
-  const totalPaid = activeInvoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+  const isVendor = party.type === "vendor";
+  const activeTxs = isVendor
+    ? purchases.filter((pu) => pu.status === "active")
+    : invoices.filter((inv) => inv.status === "active");
+  const totalBilled = activeTxs.reduce((sum, tx) => sum + tx.total, 0);
+  const totalPaid = activeTxs.reduce((sum, tx) => sum + tx.amountPaid, 0);
   const outstanding = totalBilled - totalPaid;
 
   return (
@@ -146,7 +168,9 @@ export default function PartyDetailPage() {
 
       <header className="mb-6 mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent">Party</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+            {isVendor ? "Vendor" : "Party"}
+          </p>
           <h1 className="text-2xl font-bold tracking-tight text-ink">{party.name}</h1>
           {party.address && <p className="mt-1 whitespace-pre-line text-sm text-muted">{party.address}</p>}
           <p className="mt-1 text-sm text-muted">
@@ -245,17 +269,81 @@ export default function PartyDetailPage() {
       )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Tile label="Total billed" value={money(totalBilled)} />
+        <Tile label={isVendor ? "Total purchased" : "Total billed"} value={money(totalBilled)} />
         <Tile label="Total paid" value={money(totalPaid)} tone="ok" />
-        <Tile label="Outstanding" value={money(outstanding)} tone={outstanding > 0 ? "warn" : "default"} />
+        <Tile
+          label={isVendor ? "Payable" : "Outstanding"}
+          value={money(outstanding)}
+          tone={outstanding > 0 ? "warn" : "default"}
+        />
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
         <div className="border-b border-border px-5 py-4">
-          <h2 className="text-sm font-semibold text-ink">🧾 Invoice history</h2>
-          <p className="text-xs text-muted">Every invoice ever billed to this party.</p>
+          <h2 className="text-sm font-semibold text-ink">
+            {isVendor ? "📥 Purchase history" : "🧾 Invoice history"}
+          </h2>
+          <p className="text-xs text-muted">
+            {isVendor ? "Every purchase ever recorded against this vendor." : "Every invoice ever billed to this party."}
+          </p>
         </div>
-        {invoices.length === 0 ? (
+        {isVendor ? (
+          purchases.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-muted">No purchases yet from this vendor.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                    <Th>Purchase</Th>
+                    <Th>Date</Th>
+                    <Th>Items</Th>
+                    <Th align="right">Total</Th>
+                    <Th>Payment</Th>
+                    <Th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map((pu, i) => {
+                    const voided = pu.status === "voided";
+                    return (
+                      <tr
+                        key={pu.id}
+                        className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft ${voided ? "opacity-50" : ""}`}
+                      >
+                        <Td className="font-medium text-ink">
+                          <span className={voided ? "line-through" : ""}>{purchaseNumberFor(pu.id)}</span>
+                          {voided && (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
+                              ⊘ Voided
+                            </span>
+                          )}
+                        </Td>
+                        <Td className="text-muted">
+                          {new Date(pu.createdAt).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </Td>
+                        <Td className="max-w-xs whitespace-normal text-muted">{pu.itemsLabel}</Td>
+                        <Td align="right" className="text-ink">
+                          {money(pu.total)}
+                        </Td>
+                        <Td>{!voided && <PaymentPill status={pu.paymentStatus} />}</Td>
+                        <Td>
+                          <Link href={`/purchases/${pu.id}`} className="font-medium text-accent hover:underline">
+                            View
+                          </Link>
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : invoices.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-muted">No invoices yet for this party.</p>
         ) : (
           <div className="overflow-x-auto">

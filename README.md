@@ -1,10 +1,11 @@
 # CounterBook
 
 A billing and stock console: place multi-item sales (reduces stock, generates a
-printable GST invoice), track payment and void mistaken invoices, browse/reprint every
-invoice ever placed, run monthly GST/sales reports, manage stock/products/GST rates, and
-keep a reusable customer (party) master with a running ledger per customer — all backed
-by Supabase (Postgres). Password-gated, deployed on Vercel.
+printable GST invoice), record vendor purchases (stocks in with a real cost and vendor on
+record), track payment and void mistaken invoices/purchases, browse/reprint every invoice
+ever placed, run monthly GST/sales reports, manage stock/products/GST rates, and keep a
+reusable party master — customers and vendors alike — with a running ledger per party —
+all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
 
 ## Look and feel
 
@@ -72,17 +73,28 @@ by Supabase (Postgres). Password-gated, deployed on Vercel.
     from the name + address given if nothing matches — so parties build up automatically
     just from billing, no separate mandatory data-entry step. Either way the invoice
     keeps its own `customer_name`/`customer_address` snapshot, which never changes later
-    even if the party's saved details do. `getParties()` aggregates each party's active
-    invoices into an invoice count, total billed, total paid, and outstanding balance.
-    `type` exists on `parties` now (not just `'customer'`) so a future purchases/vendors
-    milestone can reuse this same table.
+    even if the party's saved details do. `getParties(type)` aggregates each party's
+    active transactions into a count, total billed/purchased, total paid, and
+    outstanding/payable balance — `type` selects whether that's computed from `invoices`
+    (customers) or `purchases` (vendors), the two tables share column names for exactly
+    this reason.
+  - `recordPurchase()` / `getPurchases()` / `getPurchaseById()` / `updatePurchasePayment()`
+    / `voidPurchase()` are the purchase-side mirror of the invoice functions above —
+    `recordPurchase()` calls the `record_purchase` Postgres function, which stocks in
+    every item and resolves/creates a vendor party the same way `place_invoice()` does
+    for customers, in one transaction. Deliberately never touches `products.cost` (the
+    selling price) — purchase cost and selling price are kept as two different numbers.
+    `voidPurchase()` reverses stock instead of restoring it, floored at zero in case some
+    of that stock has already been sold on by the time a mistaken purchase is caught.
 - `src/app/api/*` — route handlers: `login`, `logout`, `products` (GET list + POST
   create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
   remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice — accepts
   an optional `partyId`), `invoices` (GET list), `invoices/[id]` (GET one + PATCH
   payment, for the reprint page), `invoices/[id]/void` (POST), `invoices/export` (POST,
-  builds and streams back an `.xlsx` file), `parties` (GET list-with-balances + POST
-  create), `parties/[id]` (GET party + their invoice ledger + PATCH update), `reports`
+  builds and streams back an `.xlsx` file), `purchases` (GET list + POST record — accepts
+  an optional `partyId`), `purchases/[id]` (GET one + PATCH payment), `purchases/[id]/void`
+  (POST), `parties` (GET list-with-balances, `?type=customer|vendor` + POST create),
+  `parties/[id]` (GET party + their invoice-or-purchase ledger + PATCH update), `reports`
   (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
@@ -95,11 +107,13 @@ by Supabase (Postgres). Password-gated, deployed on Vercel.
     their address and bills that party directly; typing a new name still works, and a
     party is created from it automatically on submit. No stock table here — that lives
     on its own tab so the order-entry screen stays focused.
-  - `parties/page.tsx` — **Parties**: every saved customer, searchable, with invoice
-    count/total billed/outstanding per party, and a form to add one manually.
-  - `parties/[id]/page.tsx` — a party's own details (editable) plus their full invoice
-    ledger — every invoice ever billed to them, newest first, linking through to each
-    one's print view.
+  - `parties/page.tsx` — **Parties**: a Customers/Vendors toggle over the same list —
+    every saved party of that type, searchable, with a transaction count/total
+    billed-or-purchased/outstanding-or-payable, and a form to add one manually.
+  - `parties/[id]/page.tsx` — a party's own details (editable) plus their full
+    transaction ledger — every invoice billed to them if they're a customer, or every
+    purchase recorded against them if they're a vendor, newest first, linking through to
+    each one's detail/print view.
   - `stock/page.tsx` — **Stock**: every product's cost, GST rate, current stock and
     status, in a searchable bordered/striped table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
@@ -121,6 +135,15 @@ by Supabase (Postgres). Password-gated, deployed on Vercel.
     (screen only): a "Record payment" form and a "Void invoice" control (asks for a
     reason, then restores stock). A voided invoice shows a red VOIDED banner — printed
     too, not just on screen — instead of those controls.
+  - `purchases/page.tsx` — **Purchases**: every vendor bill ever recorded, newest first,
+    with the same date/search filtering as Invoices, plus a "+ New purchase" form — pick
+    or type a vendor, add items with the actual cost paid per unit (pre-filled from the
+    product's own price as a starting guess, but editable — the whole point is recording
+    what you really paid). Submitting stocks in every item and goes straight to the new
+    purchase's detail screen.
+  - `purchases/[id]/page.tsx` — a purchase's line items and totals (CGST/SGST split,
+    same as an invoice), plus screen-only "Record payment" and "Void purchase" controls —
+    voiding reverses the stock this purchase added instead of restoring it.
   - `reports/page.tsx` — **Reports**: pick a month, see invoice count, taxable sales,
     GST collected, amount received/outstanding, and a per-GST-rate breakdown.
   - `stock-entry/page.tsx` — **Stock Entry**: add stock, remove stock (with required

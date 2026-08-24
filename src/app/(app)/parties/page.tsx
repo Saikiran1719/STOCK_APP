@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 
+type PartyType = "customer" | "vendor";
+
 type Party = {
   id: number;
   name: string;
@@ -19,6 +21,7 @@ type Party = {
 type Message = { type: "ok" | "error"; text: string };
 
 export default function PartiesPage() {
+  const [type, setType] = useState<PartyType>("customer");
   const [parties, setParties] = useState<Party[]>([]);
   const [currency, setCurrency] = useState("");
   const [loading, setLoading] = useState(true);
@@ -34,11 +37,14 @@ export default function PartiesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
 
-  async function loadParties() {
+  async function loadParties(forType: PartyType) {
     setLoading(true);
     setLoadError("");
     try {
-      const [partyRes, prodRes] = await Promise.all([fetch("/api/parties"), fetch("/api/products")]);
+      const [partyRes, prodRes] = await Promise.all([
+        fetch(`/api/parties?type=${forType}`),
+        fetch("/api/products"),
+      ]);
       if (partyRes.status === 401) {
         window.location.href = "/login";
         return;
@@ -61,8 +67,12 @@ export default function PartiesPage() {
   }
 
   useEffect(() => {
-    loadParties();
-  }, []);
+    loadParties(type);
+    setSearch("");
+    setShowForm(false);
+    setMessage(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -82,7 +92,7 @@ export default function PartiesPage() {
       const res = await fetch("/api/parties", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, address, phone, email, gstin }),
+        body: JSON.stringify({ name, address, phone, email, gstin, type }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -95,7 +105,7 @@ export default function PartiesPage() {
       setPhone("");
       setEmail("");
       setGstin("");
-      await loadParties();
+      await loadParties(type);
     } finally {
       setSubmitting(false);
     }
@@ -104,15 +114,23 @@ export default function PartiesPage() {
   const money = (n: number) =>
     `${currency}${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const isVendor = type === "vendor";
+  const countLabel = isVendor ? "Purchases" : "Invoices";
+  const billedLabel = isVendor ? "Purchased" : "Billed";
+  const outstandingLabel = isVendor ? "Payable" : "Outstanding";
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-6 sm:px-8 sm:py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-accent">Customers</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+            {isVendor ? "Suppliers" : "Customers"}
+          </p>
           <h1 className="text-2xl font-bold tracking-tight text-ink">Parties</h1>
           <p className="mt-1 text-sm text-muted">
-            Every customer you&apos;ve billed, saved once and reused — pick them on a sale instead of
-            retyping their details.
+            {isVendor
+              ? "Every supplier you've bought from, saved once and reused — pick them on a purchase instead of retyping their details."
+              : "Every customer you've billed, saved once and reused — pick them on a sale instead of retyping their details."}
           </p>
         </div>
         <button
@@ -120,9 +138,30 @@ export default function PartiesPage() {
           onClick={() => setShowForm((v) => !v)}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-dark"
         >
-          {showForm ? "Cancel" : "+ Add party"}
+          {showForm ? "Cancel" : `+ Add ${isVendor ? "vendor" : "party"}`}
         </button>
       </header>
+
+      <div className="mb-6 inline-flex rounded-lg border border-line bg-card p-1">
+        <button
+          type="button"
+          onClick={() => setType("customer")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+            type === "customer" ? "bg-accent text-white" : "text-muted hover:text-ink"
+          }`}
+        >
+          Customers
+        </button>
+        <button
+          type="button"
+          onClick={() => setType("vendor")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+            type === "vendor" ? "bg-accent text-white" : "text-muted hover:text-ink"
+          }`}
+        >
+          Vendors
+        </button>
+      </div>
 
       {showForm && (
         <form
@@ -220,14 +259,17 @@ export default function PartiesPage() {
               className="w-full max-w-xs rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
             <p className="text-sm text-muted">
-              {filtered.length} part{filtered.length === 1 ? "y" : "ies"} · Outstanding: {money(totalOutstanding)}
+              {filtered.length} part{filtered.length === 1 ? "y" : "ies"} · {outstandingLabel}:{" "}
+              {money(totalOutstanding)}
             </p>
           </div>
 
           {filtered.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-muted">
               {parties.length === 0
-                ? "No parties yet — add one, or they'll be saved automatically the next time you bill a new customer."
+                ? isVendor
+                  ? "No vendors yet — add one, or they'll be saved automatically the next time you record a purchase."
+                  : "No parties yet — add one, or they'll be saved automatically the next time you bill a new customer."
                 : "No parties match that search."}
             </p>
           ) : (
@@ -238,9 +280,9 @@ export default function PartiesPage() {
                     <Th>Name</Th>
                     <Th>Phone</Th>
                     <Th>GSTIN</Th>
-                    <Th align="right">Invoices</Th>
-                    <Th align="right">Billed</Th>
-                    <Th align="right">Outstanding</Th>
+                    <Th align="right">{countLabel}</Th>
+                    <Th align="right">{billedLabel}</Th>
+                    <Th align="right">{outstandingLabel}</Th>
                   </tr>
                 </thead>
                 <tbody>

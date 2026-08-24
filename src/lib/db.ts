@@ -102,6 +102,53 @@ export type PartyInput = {
 
 export type PartyResult = { ok: true; party: Party } | { ok: false; error: string };
 
+export type PurchaseItemInput = { name: string; qty: number; unitCost: number };
+
+export type PurchaseItem = {
+  productName: string;
+  qty: number;
+  unitCost: number;
+  gstRate: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+};
+
+export type PurchaseSummary = {
+  id: number;
+  partyId: number | null;
+  vendorName: string;
+  vendorRef: string;
+  itemsLabel: string;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+  amountPaid: number;
+  paymentStatus: PaymentStatus;
+  status: InvoiceStatus;
+  createdAt: string;
+};
+
+export type PurchaseDetail = {
+  id: number;
+  partyId: number | null;
+  vendorName: string;
+  vendorRef: string;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+  amountPaid: number;
+  paymentStatus: PaymentStatus;
+  status: InvoiceStatus;
+  voidReason: string | null;
+  createdAt: string;
+  items: PurchaseItem[];
+};
+
+export type PlacePurchaseResult =
+  | { ok: true; purchaseId: number; total: number }
+  | { ok: false; error: string };
+
 export type StockAdjustmentRecord = {
   id: number;
   productName: string;
@@ -183,10 +230,12 @@ let demoProducts: Product[] = [
   { id: 3, name: "MONITER", cost: 5000, stock: 5, gstRate: 18 },
 ];
 let demoInvoices: InvoiceDetail[] = [];
+let demoPurchases: PurchaseDetail[] = [];
 let demoStockAdjustments: StockAdjustmentRecord[] = [];
 let demoParties: Party[] = [];
 let demoNextProductId = 4;
 let demoNextInvoiceId = 1;
+let demoNextPurchaseId = 1;
 let demoNextAdjustmentId = 1;
 let demoNextPartyId = 1;
 let demoSettings: Settings = { ...DEFAULT_SETTINGS };
@@ -195,15 +244,13 @@ function getDemoProducts(): Product[] {
   return demoProducts.map((p) => ({ ...p }));
 }
 
-/** Exact case-insensitive name match reuses that party; otherwise a new one is created. */
-function findOrCreateDemoParty(name: string, address: string): Party {
-  const existing = demoParties.find(
-    (p) => p.type === "customer" && p.name.toLowerCase() === name.toLowerCase()
-  );
+/** Exact case-insensitive name match (within the same type) reuses that party; otherwise a new one is created. */
+function findOrCreateDemoParty(name: string, address: string, type: "customer" | "vendor" = "customer"): Party {
+  const existing = demoParties.find((p) => p.type === type && p.name.toLowerCase() === name.toLowerCase());
   if (existing) return existing;
   const party: Party = {
     id: demoNextPartyId++,
-    type: "customer",
+    type,
     name,
     address,
     phone: "",
@@ -215,16 +262,21 @@ function findOrCreateDemoParty(name: string, address: string): Party {
   return party;
 }
 
-function getDemoPartiesWithBalance(): PartyWithBalance[] {
+function getDemoPartiesWithBalance(type: "customer" | "vendor" = "customer"): PartyWithBalance[] {
   return demoParties
-    .filter((p) => p.type === "customer")
+    .filter((p) => p.type === type)
     .map((p) => {
-      const invoices = demoInvoices.filter((inv) => inv.partyId === p.id && inv.status === "active");
-      const totalBilled = invoices.reduce((sum, inv) => sum + inv.total, 0);
-      const totalPaid = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+      // Customers: what they owe us, from invoices. Vendors: what we owe
+      // them, from purchases. Same shape, different source table.
+      const txs =
+        type === "vendor"
+          ? demoPurchases.filter((pu) => pu.partyId === p.id && pu.status === "active")
+          : demoInvoices.filter((inv) => inv.partyId === p.id && inv.status === "active");
+      const totalBilled = txs.reduce((sum, tx) => sum + tx.total, 0);
+      const totalPaid = txs.reduce((sum, tx) => sum + tx.amountPaid, 0);
       return {
         ...p,
-        invoiceCount: invoices.length,
+        invoiceCount: txs.length,
         totalBilled,
         totalPaid,
         outstanding: totalBilled - totalPaid,
@@ -233,16 +285,14 @@ function getDemoPartiesWithBalance(): PartyWithBalance[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function createDemoParty(input: PartyInput): PartyResult {
+function createDemoParty(input: PartyInput, type: "customer" | "vendor" = "customer"): PartyResult {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Name is required." };
-  const exists = demoParties.some(
-    (p) => p.type === "customer" && p.name.toLowerCase() === name.toLowerCase()
-  );
+  const exists = demoParties.some((p) => p.type === type && p.name.toLowerCase() === name.toLowerCase());
   if (exists) return { ok: false, error: `A party named "${name}" already exists.` };
   const party: Party = {
     id: demoNextPartyId++,
-    type: "customer",
+    type,
     name,
     address: (input.address ?? "").trim(),
     phone: (input.phone ?? "").trim(),
@@ -272,11 +322,15 @@ function getDemoPartyById(id: number): Party | null {
   return party ? { ...party } : null;
 }
 
-function getDemoPartyLedger(id: number): { party: Party; invoices: InvoiceSummary[] } | null {
+function getDemoPartyLedger(
+  id: number
+): { party: Party; invoices: InvoiceSummary[]; purchases: PurchaseSummary[] } | null {
   const party = getDemoPartyById(id);
   if (!party) return null;
-  const invoices = getDemoInvoices().filter((inv) => inv.partyId === id);
-  return { party, invoices };
+  if (party.type === "vendor") {
+    return { party, invoices: [], purchases: getDemoPurchases().filter((pu) => pu.partyId === id) };
+  }
+  return { party, invoices: getDemoInvoices().filter((inv) => inv.partyId === id), purchases: [] };
 }
 
 function placeDemoInvoice(
@@ -421,6 +475,134 @@ function voidDemoInvoice(id: number, reason: string): SimpleResult {
   return { ok: true };
 }
 
+function placeDemoPurchase(
+  items: PurchaseItemInput[],
+  vendorName: string,
+  vendorRef: string,
+  partyId?: number
+): PlacePurchaseResult {
+  if (items.length === 0) {
+    return { ok: false, error: "Add at least one item." };
+  }
+  if (!vendorName.trim()) {
+    return { ok: false, error: "Vendor name is required." };
+  }
+
+  const lines: { product: Product; qty: number; unitCost: number }[] = [];
+  for (const item of items) {
+    if (!Number.isInteger(item.qty) || item.qty <= 0) {
+      return { ok: false, error: `Enter a valid quantity for ${item.name}.` };
+    }
+    if (!Number.isFinite(item.unitCost) || item.unitCost < 0) {
+      return { ok: false, error: `Enter a valid cost for ${item.name}.` };
+    }
+    const product = demoProducts.find((p) => p.name.toLowerCase() === item.name.toLowerCase());
+    if (!product) {
+      return { ok: false, error: `Product "${item.name}" was not found.` };
+    }
+    lines.push({ product, qty: item.qty, unitCost: item.unitCost });
+  }
+
+  const purchaseItems: PurchaseItem[] = [];
+  let subtotal = 0;
+  let gstAmount = 0;
+  let total = 0;
+
+  for (const { product, qty, unitCost } of lines) {
+    product.stock += qty;
+    const lineSubtotal = unitCost * qty;
+    const lineGst = (lineSubtotal * product.gstRate) / 100;
+    const lineTotal = lineSubtotal + lineGst;
+    purchaseItems.push({
+      productName: product.name,
+      qty,
+      unitCost,
+      gstRate: product.gstRate,
+      subtotal: lineSubtotal,
+      gstAmount: lineGst,
+      total: lineTotal,
+    });
+    subtotal += lineSubtotal;
+    gstAmount += lineGst;
+    total += lineTotal;
+  }
+
+  const resolvedParty = partyId
+    ? demoParties.find((p) => p.id === partyId) ?? null
+    : findOrCreateDemoParty(vendorName.trim(), "", "vendor");
+
+  const purchase: PurchaseDetail = {
+    id: demoNextPurchaseId++,
+    partyId: resolvedParty?.id ?? null,
+    vendorName: vendorName.trim(),
+    vendorRef: vendorRef.trim(),
+    subtotal,
+    gstAmount,
+    total,
+    amountPaid: 0,
+    paymentStatus: "unpaid",
+    status: "active",
+    voidReason: null,
+    createdAt: new Date().toISOString(),
+    items: purchaseItems,
+  };
+  demoPurchases.push(purchase);
+
+  return { ok: true, purchaseId: purchase.id, total };
+}
+
+function getDemoPurchases(): PurchaseSummary[] {
+  return demoPurchases
+    .slice()
+    .reverse()
+    .map((pu) => ({
+      id: pu.id,
+      partyId: pu.partyId,
+      vendorName: pu.vendorName,
+      vendorRef: pu.vendorRef,
+      itemsLabel: pu.items.map((it) => `${it.productName} x${it.qty}`).join(", "),
+      subtotal: pu.subtotal,
+      gstAmount: pu.gstAmount,
+      total: pu.total,
+      amountPaid: pu.amountPaid,
+      paymentStatus: pu.paymentStatus,
+      status: pu.status,
+      createdAt: pu.createdAt,
+    }));
+}
+
+function getDemoPurchaseById(id: number): PurchaseDetail | null {
+  const purchase = demoPurchases.find((pu) => pu.id === id);
+  return purchase ? { ...purchase, items: purchase.items.map((it) => ({ ...it })) } : null;
+}
+
+function updateDemoPurchasePayment(id: number, amountPaid: number): PaymentUpdateResult {
+  const purchase = demoPurchases.find((pu) => pu.id === id);
+  if (!purchase) return { ok: false, error: "Purchase not found." };
+  if (purchase.status === "voided") {
+    return { ok: false, error: "Cannot record payment on a voided purchase." };
+  }
+  const clamped = Math.max(0, Math.min(amountPaid, purchase.total));
+  purchase.amountPaid = clamped;
+  purchase.paymentStatus = derivePaymentStatus(purchase.total, clamped);
+  return { ok: true, amountPaid: clamped, paymentStatus: purchase.paymentStatus };
+}
+
+function voidDemoPurchase(id: number, reason: string): SimpleResult {
+  const purchase = demoPurchases.find((pu) => pu.id === id);
+  if (!purchase) return { ok: false, error: "Purchase not found." };
+  if (purchase.status === "voided") return { ok: false, error: "This purchase is already voided." };
+
+  for (const item of purchase.items) {
+    const product = demoProducts.find((p) => p.name === item.productName);
+    if (product) product.stock = Math.max(0, product.stock - item.qty);
+  }
+
+  purchase.status = "voided";
+  purchase.voidReason = reason;
+  return { ok: true };
+}
+
 function getDemoStockAdjustments(): StockAdjustmentRecord[] {
   return demoStockAdjustments.slice().reverse();
 }
@@ -554,6 +736,20 @@ function parseInvoiceError(message: string): string {
   if (message.includes("customer_address_required")) return "Customer address is required.";
 
   return "Failed to place the order. Please try again.";
+}
+
+// Postgres exception messages from record_purchase, same idea as parseInvoiceError above.
+function parsePurchaseError(message: string): string {
+  const notFound = message.match(/not_found:(.+)/);
+  if (notFound) return `Product "${notFound[1]}" was not found.`;
+
+  const invalidCost = message.match(/invalid_cost:(.+)/);
+  if (invalidCost) return `Enter a valid cost for ${invalidCost[1]}.`;
+
+  if (message.includes("no_items")) return "Add at least one item.";
+  if (message.includes("vendor_name_required")) return "Vendor name is required.";
+
+  return "Failed to record the purchase. Please try again.";
 }
 
 // --- Real Supabase backend ---
@@ -955,6 +1151,232 @@ export async function voidInvoice(id: number, reason: string): Promise<SimpleRes
   return { ok: true };
 }
 
+const PURCHASE_SUMMARY_SELECT =
+  "id, party_id, vendor_name, vendor_ref, subtotal, gst_amount, total, amount_paid, status, created_at, purchase_items(product_name, qty)";
+
+type PurchaseSummaryRow = {
+  id: number;
+  party_id: number | null;
+  vendor_name: string;
+  vendor_ref: string | null;
+  subtotal: unknown;
+  gst_amount: unknown;
+  total: unknown;
+  amount_paid: unknown;
+  status: string | null;
+  created_at: string;
+  purchase_items: { product_name: string; qty: number }[] | null;
+};
+
+function toPurchaseSummary(pu: PurchaseSummaryRow): PurchaseSummary {
+  const total = Number(pu.total);
+  const amountPaid = Number(pu.amount_paid ?? 0);
+  return {
+    id: pu.id,
+    partyId: pu.party_id ?? null,
+    vendorName: pu.vendor_name ?? "",
+    vendorRef: pu.vendor_ref ?? "",
+    itemsLabel: (pu.purchase_items ?? []).map((it) => `${it.product_name} x${it.qty}`).join(", "),
+    subtotal: Number(pu.subtotal),
+    gstAmount: Number(pu.gst_amount),
+    total,
+    amountPaid,
+    paymentStatus: derivePaymentStatus(total, amountPaid),
+    status: (pu.status ?? "active") as InvoiceStatus,
+    createdAt: pu.created_at,
+  };
+}
+
+/**
+ * Records a vendor bill and stocks in every item — the purchase-side
+ * mirror of placeInvoice(). The Supabase path runs entirely inside the
+ * record_purchase Postgres function (see supabase/schema.sql), so a
+ * failure partway through rolls back every item's stock change too.
+ */
+export async function recordPurchase(
+  items: PurchaseItemInput[],
+  vendorName: string,
+  vendorRef: string,
+  partyId?: number
+): Promise<PlacePurchaseResult> {
+  const cleanItems = items
+    .map((it) => ({ name: (it.name ?? "").trim(), qty: Number(it.qty), unitCost: Number(it.unitCost) }))
+    .filter((it) => it.name.length > 0);
+
+  if (cleanItems.length === 0) {
+    return { ok: false, error: "Add at least one item." };
+  }
+  for (const it of cleanItems) {
+    if (!Number.isInteger(it.qty) || it.qty <= 0) {
+      return { ok: false, error: `Enter a valid quantity for ${it.name}.` };
+    }
+    if (!Number.isFinite(it.unitCost) || it.unitCost < 0) {
+      return { ok: false, error: `Enter a valid cost for ${it.name}.` };
+    }
+  }
+
+  const cleanVendorName = (vendorName ?? "").trim();
+  const cleanVendorRef = (vendorRef ?? "").trim();
+  if (!cleanVendorName) {
+    return { ok: false, error: "Vendor name is required." };
+  }
+
+  if (isDemoMode()) {
+    return placeDemoPurchase(cleanItems, cleanVendorName, cleanVendorRef, partyId);
+  }
+
+  const { data, error } = await getClient().rpc("record_purchase", {
+    p_vendor_name: cleanVendorName,
+    p_vendor_ref: cleanVendorRef,
+    p_items: cleanItems.map((it) => ({ name: it.name, qty: it.qty, unitCost: it.unitCost })),
+    p_party_id: partyId ?? null,
+  });
+
+  if (error) {
+    return { ok: false, error: parsePurchaseError(error.message) };
+  }
+
+  const row = (data as { purchase_id: number; purchase_total: unknown }[] | null)?.[0];
+  if (!row) {
+    return { ok: false, error: "Failed to record the purchase. Please try again." };
+  }
+
+  return { ok: true, purchaseId: row.purchase_id, total: Number(row.purchase_total) };
+}
+
+export async function getPurchases(): Promise<PurchaseSummary[]> {
+  if (isDemoMode()) {
+    return getDemoPurchases();
+  }
+
+  const { data, error } = await getClient()
+    .from("purchases")
+    .select(PURCHASE_SUMMARY_SELECT)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(toPurchaseSummary);
+}
+
+export async function getPurchaseById(id: number): Promise<PurchaseDetail | null> {
+  if (isDemoMode()) {
+    return getDemoPurchaseById(id);
+  }
+
+  const { data, error } = await getClient()
+    .from("purchases")
+    .select(
+      "id, party_id, vendor_name, vendor_ref, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, purchase_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  type ItemRow = {
+    product_name: string;
+    qty: number;
+    unit_cost: unknown;
+    gst_rate: unknown;
+    subtotal: unknown;
+    gst_amount: unknown;
+    total: unknown;
+  };
+
+  const total = Number(data.total);
+  const amountPaid = Number(data.amount_paid ?? 0);
+
+  return {
+    id: data.id,
+    partyId: data.party_id ?? null,
+    vendorName: data.vendor_name ?? "",
+    vendorRef: data.vendor_ref ?? "",
+    subtotal: Number(data.subtotal),
+    gstAmount: Number(data.gst_amount),
+    total,
+    amountPaid,
+    paymentStatus: derivePaymentStatus(total, amountPaid),
+    status: (data.status ?? "active") as InvoiceStatus,
+    voidReason: data.void_reason ?? null,
+    createdAt: data.created_at,
+    items: ((data.purchase_items ?? []) as ItemRow[]).map((it) => ({
+      productName: it.product_name,
+      qty: it.qty,
+      unitCost: Number(it.unit_cost),
+      gstRate: Number(it.gst_rate),
+      subtotal: Number(it.subtotal),
+      gstAmount: Number(it.gst_amount),
+      total: Number(it.total),
+    })),
+  };
+}
+
+/** Records a (possibly partial) payment against a purchase — what you've paid the vendor. */
+export async function updatePurchasePayment(id: number, amountPaid: number): Promise<PaymentUpdateResult> {
+  if (!Number.isFinite(amountPaid) || amountPaid < 0) {
+    return { ok: false, error: "Amount paid must be 0 or more." };
+  }
+
+  if (isDemoMode()) {
+    return updateDemoPurchasePayment(id, amountPaid);
+  }
+
+  const supabase = getClient();
+  const { data: purchaseRow, error: fetchError } = await supabase
+    .from("purchases")
+    .select("total, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!purchaseRow) return { ok: false, error: "Purchase not found." };
+  if (purchaseRow.status === "voided") {
+    return { ok: false, error: "Cannot record payment on a voided purchase." };
+  }
+
+  const total = Number(purchaseRow.total);
+  const clamped = Math.max(0, Math.min(amountPaid, total));
+
+  const { error } = await supabase.from("purchases").update({ amount_paid: clamped }).eq("id", id);
+  if (error) throw error;
+
+  return { ok: true, amountPaid: clamped, paymentStatus: derivePaymentStatus(total, clamped) };
+}
+
+/**
+ * Voids a purchase: reverses stock for every line item and marks it
+ * voided, atomically (see void_purchase in supabase/schema.sql). Requires
+ * a reason.
+ */
+export async function voidPurchase(id: number, reason: string): Promise<SimpleResult> {
+  const cleanReason = reason.trim();
+  if (!cleanReason) {
+    return { ok: false, error: "A reason is required to void a purchase." };
+  }
+
+  if (isDemoMode()) {
+    return voidDemoPurchase(id, cleanReason);
+  }
+
+  const { error } = await getClient().rpc("void_purchase", {
+    p_purchase_id: id,
+    p_reason: cleanReason,
+  });
+
+  if (error) {
+    if (error.message.includes("purchase_not_found")) {
+      return { ok: false, error: "Purchase not found." };
+    }
+    if (error.message.includes("already_voided")) {
+      return { ok: false, error: "This purchase is already voided." };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
 function toParty(row: {
   id: number;
   type: string;
@@ -978,36 +1400,40 @@ function toParty(row: {
 }
 
 /**
- * Every saved customer, with an invoice count/total billed/total paid/
- * outstanding aggregated from their active invoices. Small-business scale
- * (at most low thousands of invoices), so aggregating client-side after two
- * plain selects is simpler and just as fast as a dedicated SQL view.
+ * Every saved party of the given type. Customers get an invoice
+ * count/billed/paid/outstanding (what they owe us, from `invoices`);
+ * vendors get the same shape computed from `purchases` instead (what we
+ * owe them) — the two tables share column names for exactly this reason.
+ * Small-business scale (at most low thousands of rows), so aggregating
+ * client-side after two plain selects is simpler and just as fast as a
+ * dedicated SQL view.
  */
-export async function getParties(): Promise<PartyWithBalance[]> {
+export async function getParties(type: "customer" | "vendor" = "customer"): Promise<PartyWithBalance[]> {
   if (isDemoMode()) {
-    return getDemoPartiesWithBalance();
+    return getDemoPartiesWithBalance(type);
   }
 
   const supabase = getClient();
-  const [partiesRes, invoicesRes] = await Promise.all([
+  const txTable = type === "vendor" ? "purchases" : "invoices";
+  const [partiesRes, txRes] = await Promise.all([
     supabase
       .from("parties")
       .select("id, type, name, address, phone, email, gstin, created_at")
-      .eq("type", "customer"),
-    supabase.from("invoices").select("party_id, total, amount_paid").eq("status", "active"),
+      .eq("type", type),
+    supabase.from(txTable).select("party_id, total, amount_paid").eq("status", "active"),
   ]);
 
   if (partiesRes.error) throw partiesRes.error;
-  if (invoicesRes.error) throw invoicesRes.error;
+  if (txRes.error) throw txRes.error;
 
   const byParty = new Map<number, { count: number; billed: number; paid: number }>();
-  for (const inv of invoicesRes.data ?? []) {
-    if (inv.party_id == null) continue;
-    const bucket = byParty.get(inv.party_id) ?? { count: 0, billed: 0, paid: 0 };
+  for (const tx of txRes.data ?? []) {
+    if (tx.party_id == null) continue;
+    const bucket = byParty.get(tx.party_id) ?? { count: 0, billed: 0, paid: 0 };
     bucket.count += 1;
-    bucket.billed += Number(inv.total);
-    bucket.paid += Number(inv.amount_paid ?? 0);
-    byParty.set(inv.party_id, bucket);
+    bucket.billed += Number(tx.total);
+    bucket.paid += Number(tx.amount_paid ?? 0);
+    byParty.set(tx.party_id, bucket);
   }
 
   return (partiesRes.data ?? [])
@@ -1025,20 +1451,23 @@ export async function getParties(): Promise<PartyWithBalance[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Adds a new party. Blocks an exact case-insensitive name duplicate. */
-export async function createParty(input: PartyInput): Promise<PartyResult> {
+/** Adds a new party. Blocks an exact case-insensitive name duplicate within the same type. */
+export async function createParty(
+  input: PartyInput,
+  type: "customer" | "vendor" = "customer"
+): Promise<PartyResult> {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Name is required." };
 
   if (isDemoMode()) {
-    return createDemoParty(input);
+    return createDemoParty(input, type);
   }
 
   const supabase = getClient();
   const { data: existing, error: findError } = await supabase
     .from("parties")
     .select("id")
-    .eq("type", "customer")
+    .eq("type", type)
     .ilike("name", name)
     .maybeSingle();
   if (findError) throw findError;
@@ -1049,7 +1478,7 @@ export async function createParty(input: PartyInput): Promise<PartyResult> {
   const { data, error } = await supabase
     .from("parties")
     .insert({
-      type: "customer",
+      type,
       name,
       address: (input.address ?? "").trim(),
       phone: (input.phone ?? "").trim(),
@@ -1063,7 +1492,7 @@ export async function createParty(input: PartyInput): Promise<PartyResult> {
   return { ok: true, party: toParty(data) };
 }
 
-/** Updates a party's saved details — does not touch any invoice already billed to them. */
+/** Updates a party's saved details — does not touch any invoice/purchase already on record. */
 export async function updateParty(id: number, input: PartyInput): Promise<PartyResult> {
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Name is required." };
@@ -1090,10 +1519,15 @@ export async function updateParty(id: number, input: PartyInput): Promise<PartyR
   return { ok: true, party: toParty(data) };
 }
 
-/** A party's own saved details plus every invoice ever billed to them, newest first. */
+/**
+ * A party's own saved details plus their full transaction history, newest
+ * first — every invoice ever billed to them if they're a customer, or
+ * every purchase ever recorded against them if they're a vendor (the other
+ * list always comes back empty).
+ */
 export async function getPartyLedger(
   id: number
-): Promise<{ party: Party; invoices: InvoiceSummary[] } | null> {
+): Promise<{ party: Party; invoices: InvoiceSummary[]; purchases: PurchaseSummary[] } | null> {
   if (isDemoMode()) {
     return getDemoPartyLedger(id);
   }
@@ -1108,6 +1542,18 @@ export async function getPartyLedger(
   if (partyError) throw partyError;
   if (!partyRow) return null;
 
+  const party = toParty(partyRow);
+
+  if (party.type === "vendor") {
+    const { data, error } = await supabase
+      .from("purchases")
+      .select(PURCHASE_SUMMARY_SELECT)
+      .eq("party_id", id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return { party, invoices: [], purchases: (data ?? []).map(toPurchaseSummary) };
+  }
+
   const { data, error } = await supabase
     .from("invoices")
     .select(INVOICE_SUMMARY_SELECT)
@@ -1115,8 +1561,7 @@ export async function getPartyLedger(
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  return { party: toParty(partyRow), invoices: (data ?? []).map(toInvoiceSummary) };
+  return { party, invoices: (data ?? []).map(toInvoiceSummary), purchases: [] };
 }
 
 /** Recent manual stock corrections, newest first — for the Stock Entry audit log. */
