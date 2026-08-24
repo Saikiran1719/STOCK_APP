@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ProductAvatar from "@/components/ProductAvatar";
 
 type Product = { id: number; name: string; cost: number; stock: number; gstRate: number };
+type Party = { id: number; name: string; address: string };
 type CartItem = { name: string; qty: number };
 type Message = { type: "ok" | "error"; text: string };
 
@@ -18,8 +19,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
+  const [parties, setParties] = useState<Party[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+  const [partyId, setPartyId] = useState<number | undefined>(undefined);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pickProduct, setPickProduct] = useState("");
   const [pickQty, setPickQty] = useState(1);
@@ -56,7 +59,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadProducts();
+    fetch("/api/parties")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.parties) setParties(data.parties);
+      })
+      .catch(() => {});
   }, []);
+
+  function handleCustomerNameChange(value: string) {
+    setCustomerName(value);
+    const match = parties.find((p) => p.name.toLowerCase() === value.trim().toLowerCase());
+    if (match) {
+      setPartyId(match.id);
+      setCustomerAddress(match.address);
+    } else {
+      setPartyId(undefined);
+    }
+  }
 
   const totalProducts = products.length;
   const totalUnits = products.reduce((sum, p) => sum + p.stock, 0);
@@ -105,6 +125,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           customerName,
           customerAddress,
+          partyId,
           items: cart.map((c) => ({ name: c.name, qty: c.qty })),
         }),
       });
@@ -172,12 +193,19 @@ export default function DashboardPage() {
                 <input
                   id="customer"
                   type="text"
+                  list="party-options"
                   required
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  onChange={(e) => handleCustomerNameChange(e.target.value)}
                   className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  placeholder="Shown on the invoice"
+                  placeholder="Pick a saved party, or type a new customer"
                 />
+                <datalist id="party-options">
+                  {parties.map((p) => (
+                    <option key={p.id} value={p.name} />
+                  ))}
+                </datalist>
+                {partyId && <p className="mt-1 text-xs text-ok">✓ Existing party — address filled in below.</p>}
               </div>
 
               <div>

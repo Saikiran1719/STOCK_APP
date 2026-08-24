@@ -8,6 +8,7 @@ type InvoiceStatus = "active" | "voided";
 
 type Invoice = {
   id: number;
+  partyId: number | null;
   customerName: string;
   customerAddress: string;
   itemsLabel: string;
@@ -238,7 +239,15 @@ export default function InvoicesPage() {
                               day: "numeric",
                             })}
                           </Td>
-                          <Td className="text-muted">{inv.customerName || "Cash / Walk-in"}</Td>
+                          <Td className="text-muted">
+                            {inv.partyId ? (
+                              <Link href={`/parties/${inv.partyId}`} className="text-accent hover:underline">
+                                {inv.customerName || "Cash / Walk-in"}
+                              </Link>
+                            ) : (
+                              inv.customerName || "Cash / Walk-in"
+                            )}
+                          </Td>
                           <Td className="max-w-xs whitespace-normal text-muted">{inv.itemsLabel}</Td>
                           <Td align="right" className="text-ink">
                             {currency}

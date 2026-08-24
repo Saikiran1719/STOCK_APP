@@ -1,10 +1,10 @@
 # CounterBook
 
-An internal inventory console: place multi-item orders (reduces stock, generates a
+A billing and stock console: place multi-item sales (reduces stock, generates a
 printable GST invoice), track payment and void mistaken invoices, browse/reprint every
-invoice ever placed, run monthly GST/sales reports, and manage stock/products/GST rates
-from a dedicated screen — all backed by Supabase (Postgres). Password-gated, deployed on
-Vercel.
+invoice ever placed, run monthly GST/sales reports, manage stock/products/GST rates, and
+keep a reusable customer (party) master with a running ledger per customer — all backed
+by Supabase (Postgres). Password-gated, deployed on Vercel.
 
 ## Look and feel
 
@@ -64,25 +64,48 @@ Vercel.
     — the numbers a monthly GST return needs.
   - `getSettings()` / `saveSettings()` read/write the single-row `company_settings`
     table (company name, address, GSTIN, currency symbol, invoice footer note, logo).
+  - `getParties()` / `createParty()` / `updateParty()` / `getPartyLedger()` manage the
+    `parties` table — a reusable customer master instead of retyping name/address on
+    every sale. `placeInvoice()` takes an optional `partyId`: pass one to bill a party
+    picked from the Dashboard's customer field directly, or omit it and `place_invoice()`
+    resolves one itself by an exact case-insensitive name match, creating a new party
+    from the name + address given if nothing matches — so parties build up automatically
+    just from billing, no separate mandatory data-entry step. Either way the invoice
+    keeps its own `customer_name`/`customer_address` snapshot, which never changes later
+    even if the party's saved details do. `getParties()` aggregates each party's active
+    invoices into an invoice count, total billed, total paid, and outstanding balance.
+    `type` exists on `parties` now (not just `'customer'`) so a future purchases/vendors
+    milestone can reuse this same table.
 - `src/app/api/*` — route handlers: `login`, `logout`, `products` (GET list + POST
   create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
-  remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice),
-  `invoices` (GET list), `invoices/[id]` (GET one + PATCH payment, for the reprint
-  page), `invoices/[id]/void` (POST), `invoices/export` (POST, builds and streams back an
-  `.xlsx` file), `reports` (GET, `?month=YYYY-MM`).
+  remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice — accepts
+  an optional `partyId`), `invoices` (GET list), `invoices/[id]` (GET one + PATCH
+  payment, for the reprint page), `invoices/[id]/void` (POST), `invoices/export` (POST,
+  builds and streams back an `.xlsx` file), `parties` (GET list-with-balances + POST
+  create), `parties/[id]` (GET party + their invoice ledger + PATCH update), `reports`
+  (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
 - `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
   (`src/components/Sidebar.tsx`); routes inside it, in nav order:
   - `page.tsx` — **Dashboard**: KPI tiles (products, units in stock, low stock,
     inventory value) and the "New sale" cart builder (add products to a cart,
-    required customer name + address, one invoice on submit). No stock table here —
-    that lives on its own tab so the order-entry screen stays focused.
+    required customer name + address, one invoice on submit). The customer name field
+    is backed by a `<datalist>` of saved parties — typing an exact match auto-fills
+    their address and bills that party directly; typing a new name still works, and a
+    party is created from it automatically on submit. No stock table here — that lives
+    on its own tab so the order-entry screen stays focused.
+  - `parties/page.tsx` — **Parties**: every saved customer, searchable, with invoice
+    count/total billed/outstanding per party, and a form to add one manually.
+  - `parties/[id]/page.tsx` — a party's own details (editable) plus their full invoice
+    ledger — every invoice ever billed to them, newest first, linking through to each
+    one's print view.
   - `stock/page.tsx` — **Stock**: every product's cost, GST rate, current stock and
     status, in a searchable bordered/striped table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
     date filter, a customer/product search box, and a payment-status column — find one
-    and reprint it. Voided invoices show struck through with a "Voided" badge. An
+    and reprint it. A customer name links through to their party page when the invoice
+    has one. Voided invoices show struck through with a "Voided" badge. An
     "Export to Excel" button posts whatever's currently filtered to
     `POST /api/invoices/export`, which uses `exceljs` to build a real `.xlsx` file —
     bold/shaded header row, borders on every cell, columns auto-fit to their content, and
@@ -117,9 +140,10 @@ become IGST instead — not handled here.
 `.env.local` already has a working `SESSION_SECRET` and `APP_PASSWORD=demo1234`. Without
 real Supabase credentials the app runs in **demo mode**: every route above serves an
 in-memory copy of the data instead of calling Supabase, so you can click through the
-whole flow — build a multi-item order, get redirected straight to its invoice, find and
-reprint it from the Invoices list, add/remove stock, register a product, edit settings —
-before any Supabase setup.
+whole flow — build a multi-item sale (which saves the customer as a party the first
+time, then reuses them on the next sale), get redirected straight to its invoice, find
+and reprint it from the Invoices list, browse a party's ledger, add/remove stock,
+register a product, edit settings — before any Supabase setup.
 
 ```bash
 npm run dev

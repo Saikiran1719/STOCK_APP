@@ -20,6 +20,7 @@ type InvoiceItem = {
 
 type Invoice = {
   id: number;
+  partyId: number | null;
   customerName: string;
   customerAddress: string;
   subtotal: number;
@@ -247,6 +248,14 @@ export default function InvoicePage() {
           <p className="text-sm font-medium">{invoice.customerName || "Cash / Walk-in customer"}</p>
           {invoice.customerAddress && (
             <p className="whitespace-pre-line text-sm text-ink/70">{invoice.customerAddress}</p>
+          )}
+          {invoice.partyId && (
+            <Link
+              href={`/parties/${invoice.partyId}`}
+              className="mt-1 inline-block text-xs text-accent hover:underline print:hidden"
+            >
+              View party & ledger →
+            </Link>
           )}
         </div>
 

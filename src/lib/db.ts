@@ -39,6 +39,7 @@ export type InvoiceStatus = "active" | "voided";
 
 export type InvoiceSummary = {
   id: number;
+  partyId: number | null;
   customerName: string;
   customerAddress: string;
   itemsLabel: string;
@@ -53,6 +54,7 @@ export type InvoiceSummary = {
 
 export type InvoiceDetail = {
   id: number;
+  partyId: number | null;
   customerName: string;
   customerAddress: string;
   subtotal: number;
@@ -65,6 +67,40 @@ export type InvoiceDetail = {
   createdAt: string;
   items: InvoiceItem[];
 };
+
+/**
+ * A reusable customer (or, later, vendor) master — saved once, billed
+ * against repeatedly, instead of retyping name/address on every invoice.
+ * `type` exists now so a future purchases/vendors milestone can reuse this
+ * same table; today only 'customer' rows are ever created.
+ */
+export type Party = {
+  id: number;
+  type: "customer" | "vendor";
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  gstin: string;
+  createdAt: string;
+};
+
+export type PartyWithBalance = Party & {
+  invoiceCount: number;
+  totalBilled: number;
+  totalPaid: number;
+  outstanding: number;
+};
+
+export type PartyInput = {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  gstin?: string;
+};
+
+export type PartyResult = { ok: true; party: Party } | { ok: false; error: string };
 
 export type StockAdjustmentRecord = {
   id: number;
@@ -148,19 +184,106 @@ let demoProducts: Product[] = [
 ];
 let demoInvoices: InvoiceDetail[] = [];
 let demoStockAdjustments: StockAdjustmentRecord[] = [];
+let demoParties: Party[] = [];
 let demoNextProductId = 4;
 let demoNextInvoiceId = 1;
 let demoNextAdjustmentId = 1;
+let demoNextPartyId = 1;
 let demoSettings: Settings = { ...DEFAULT_SETTINGS };
 
 function getDemoProducts(): Product[] {
   return demoProducts.map((p) => ({ ...p }));
 }
 
+/** Exact case-insensitive name match reuses that party; otherwise a new one is created. */
+function findOrCreateDemoParty(name: string, address: string): Party {
+  const existing = demoParties.find(
+    (p) => p.type === "customer" && p.name.toLowerCase() === name.toLowerCase()
+  );
+  if (existing) return existing;
+  const party: Party = {
+    id: demoNextPartyId++,
+    type: "customer",
+    name,
+    address,
+    phone: "",
+    email: "",
+    gstin: "",
+    createdAt: new Date().toISOString(),
+  };
+  demoParties.push(party);
+  return party;
+}
+
+function getDemoPartiesWithBalance(): PartyWithBalance[] {
+  return demoParties
+    .filter((p) => p.type === "customer")
+    .map((p) => {
+      const invoices = demoInvoices.filter((inv) => inv.partyId === p.id && inv.status === "active");
+      const totalBilled = invoices.reduce((sum, inv) => sum + inv.total, 0);
+      const totalPaid = invoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+      return {
+        ...p,
+        invoiceCount: invoices.length,
+        totalBilled,
+        totalPaid,
+        outstanding: totalBilled - totalPaid,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function createDemoParty(input: PartyInput): PartyResult {
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Name is required." };
+  const exists = demoParties.some(
+    (p) => p.type === "customer" && p.name.toLowerCase() === name.toLowerCase()
+  );
+  if (exists) return { ok: false, error: `A party named "${name}" already exists.` };
+  const party: Party = {
+    id: demoNextPartyId++,
+    type: "customer",
+    name,
+    address: (input.address ?? "").trim(),
+    phone: (input.phone ?? "").trim(),
+    email: (input.email ?? "").trim(),
+    gstin: (input.gstin ?? "").trim(),
+    createdAt: new Date().toISOString(),
+  };
+  demoParties.push(party);
+  return { ok: true, party };
+}
+
+function updateDemoParty(id: number, input: PartyInput): PartyResult {
+  const party = demoParties.find((p) => p.id === id);
+  if (!party) return { ok: false, error: "Party not found." };
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Name is required." };
+  party.name = name;
+  party.address = (input.address ?? "").trim();
+  party.phone = (input.phone ?? "").trim();
+  party.email = (input.email ?? "").trim();
+  party.gstin = (input.gstin ?? "").trim();
+  return { ok: true, party };
+}
+
+function getDemoPartyById(id: number): Party | null {
+  const party = demoParties.find((p) => p.id === id);
+  return party ? { ...party } : null;
+}
+
+function getDemoPartyLedger(id: number): { party: Party; invoices: InvoiceSummary[] } | null {
+  const party = getDemoPartyById(id);
+  if (!party) return null;
+  const invoices = getDemoInvoices().filter((inv) => inv.partyId === id);
+  return { party, invoices };
+}
+
 function placeDemoInvoice(
   items: InvoiceItemInput[],
   customerName: string,
-  customerAddress: string
+  customerAddress: string,
+  partyId?: number
 ): PlaceInvoiceResult {
   if (items.length === 0) {
     return { ok: false, error: "Add at least one item." };
@@ -222,8 +345,13 @@ function placeDemoInvoice(
     total += lineTotal;
   }
 
+  const resolvedParty = partyId
+    ? demoParties.find((p) => p.id === partyId) ?? null
+    : findOrCreateDemoParty(customerName.trim(), customerAddress.trim());
+
   const invoice: InvoiceDetail = {
     id: demoNextInvoiceId++,
+    partyId: resolvedParty?.id ?? null,
     customerName: customerName.trim(),
     customerAddress: customerAddress.trim(),
     subtotal,
@@ -247,6 +375,7 @@ function getDemoInvoices(): InvoiceSummary[] {
     .reverse()
     .map((inv) => ({
       id: inv.id,
+      partyId: inv.partyId,
       customerName: inv.customerName,
       customerAddress: inv.customerAddress,
       itemsLabel: inv.items.map((it) => `${it.productName} x${it.qty}`).join(", "),
@@ -607,7 +736,8 @@ export async function updateProduct(
 export async function placeInvoice(
   items: InvoiceItemInput[],
   customerName: string,
-  customerAddress: string
+  customerAddress: string,
+  partyId?: number
 ): Promise<PlaceInvoiceResult> {
   const cleanItems = items
     .map((it) => ({ name: (it.name ?? "").trim(), qty: Number(it.qty) }))
@@ -632,13 +762,14 @@ export async function placeInvoice(
   }
 
   if (isDemoMode()) {
-    return placeDemoInvoice(cleanItems, cleanCustomerName, cleanCustomerAddress);
+    return placeDemoInvoice(cleanItems, cleanCustomerName, cleanCustomerAddress, partyId);
   }
 
   const { data, error } = await getClient().rpc("place_invoice", {
     p_customer_name: cleanCustomerName,
     p_customer_address: cleanCustomerAddress,
     p_items: cleanItems,
+    p_party_id: partyId ?? null,
   });
 
   if (error) {
@@ -653,6 +784,42 @@ export async function placeInvoice(
   return { ok: true, invoiceId: row.invoice_id, total: Number(row.invoice_total) };
 }
 
+const INVOICE_SUMMARY_SELECT =
+  "id, party_id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, created_at, invoice_items(product_name, qty)";
+
+type InvoiceSummaryRow = {
+  id: number;
+  party_id: number | null;
+  customer_name: string | null;
+  customer_address: string | null;
+  subtotal: unknown;
+  gst_amount: unknown;
+  total: unknown;
+  amount_paid: unknown;
+  status: string | null;
+  created_at: string;
+  invoice_items: { product_name: string; qty: number }[] | null;
+};
+
+function toInvoiceSummary(inv: InvoiceSummaryRow): InvoiceSummary {
+  const total = Number(inv.total);
+  const amountPaid = Number(inv.amount_paid ?? 0);
+  return {
+    id: inv.id,
+    partyId: inv.party_id ?? null,
+    customerName: inv.customer_name ?? "",
+    customerAddress: inv.customer_address ?? "",
+    itemsLabel: (inv.invoice_items ?? []).map((it) => `${it.product_name} x${it.qty}`).join(", "),
+    subtotal: Number(inv.subtotal),
+    gstAmount: Number(inv.gst_amount),
+    total,
+    amountPaid,
+    paymentStatus: derivePaymentStatus(total, amountPaid),
+    status: (inv.status ?? "active") as InvoiceStatus,
+    createdAt: inv.created_at,
+  };
+}
+
 export async function getInvoices(): Promise<InvoiceSummary[]> {
   if (isDemoMode()) {
     return getDemoInvoices();
@@ -660,32 +827,11 @@ export async function getInvoices(): Promise<InvoiceSummary[]> {
 
   const { data, error } = await getClient()
     .from("invoices")
-    .select(
-      "id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, created_at, invoice_items(product_name, qty)"
-    )
+    .select(INVOICE_SUMMARY_SELECT)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  return (data ?? []).map((inv) => {
-    const total = Number(inv.total);
-    const amountPaid = Number(inv.amount_paid ?? 0);
-    return {
-      id: inv.id,
-      customerName: inv.customer_name ?? "",
-      customerAddress: inv.customer_address ?? "",
-      itemsLabel: ((inv.invoice_items ?? []) as { product_name: string; qty: number }[])
-        .map((it) => `${it.product_name} x${it.qty}`)
-        .join(", "),
-      subtotal: Number(inv.subtotal),
-      gstAmount: Number(inv.gst_amount),
-      total,
-      amountPaid,
-      paymentStatus: derivePaymentStatus(total, amountPaid),
-      status: (inv.status ?? "active") as InvoiceStatus,
-      createdAt: inv.created_at,
-    };
-  });
+  return (data ?? []).map(toInvoiceSummary);
 }
 
 export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> {
@@ -696,7 +842,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
   const { data, error } = await getClient()
     .from("invoices")
     .select(
-      "id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+      "id, party_id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -719,6 +865,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
 
   return {
     id: data.id,
+    partyId: data.party_id ?? null,
     customerName: data.customer_name ?? "",
     customerAddress: data.customer_address ?? "",
     subtotal: Number(data.subtotal),
@@ -806,6 +953,170 @@ export async function voidInvoice(id: number, reason: string): Promise<SimpleRes
   }
 
   return { ok: true };
+}
+
+function toParty(row: {
+  id: number;
+  type: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  gstin: string | null;
+  created_at: string;
+}): Party {
+  return {
+    id: row.id,
+    type: row.type === "vendor" ? "vendor" : "customer",
+    name: row.name,
+    address: row.address ?? "",
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    gstin: row.gstin ?? "",
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * Every saved customer, with an invoice count/total billed/total paid/
+ * outstanding aggregated from their active invoices. Small-business scale
+ * (at most low thousands of invoices), so aggregating client-side after two
+ * plain selects is simpler and just as fast as a dedicated SQL view.
+ */
+export async function getParties(): Promise<PartyWithBalance[]> {
+  if (isDemoMode()) {
+    return getDemoPartiesWithBalance();
+  }
+
+  const supabase = getClient();
+  const [partiesRes, invoicesRes] = await Promise.all([
+    supabase
+      .from("parties")
+      .select("id, type, name, address, phone, email, gstin, created_at")
+      .eq("type", "customer"),
+    supabase.from("invoices").select("party_id, total, amount_paid").eq("status", "active"),
+  ]);
+
+  if (partiesRes.error) throw partiesRes.error;
+  if (invoicesRes.error) throw invoicesRes.error;
+
+  const byParty = new Map<number, { count: number; billed: number; paid: number }>();
+  for (const inv of invoicesRes.data ?? []) {
+    if (inv.party_id == null) continue;
+    const bucket = byParty.get(inv.party_id) ?? { count: 0, billed: 0, paid: 0 };
+    bucket.count += 1;
+    bucket.billed += Number(inv.total);
+    bucket.paid += Number(inv.amount_paid ?? 0);
+    byParty.set(inv.party_id, bucket);
+  }
+
+  return (partiesRes.data ?? [])
+    .map((row) => {
+      const party = toParty(row);
+      const bucket = byParty.get(party.id) ?? { count: 0, billed: 0, paid: 0 };
+      return {
+        ...party,
+        invoiceCount: bucket.count,
+        totalBilled: bucket.billed,
+        totalPaid: bucket.paid,
+        outstanding: bucket.billed - bucket.paid,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Adds a new party. Blocks an exact case-insensitive name duplicate. */
+export async function createParty(input: PartyInput): Promise<PartyResult> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Name is required." };
+
+  if (isDemoMode()) {
+    return createDemoParty(input);
+  }
+
+  const supabase = getClient();
+  const { data: existing, error: findError } = await supabase
+    .from("parties")
+    .select("id")
+    .eq("type", "customer")
+    .ilike("name", name)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (existing) {
+    return { ok: false, error: `A party named "${name}" already exists.` };
+  }
+
+  const { data, error } = await supabase
+    .from("parties")
+    .insert({
+      type: "customer",
+      name,
+      address: (input.address ?? "").trim(),
+      phone: (input.phone ?? "").trim(),
+      email: (input.email ?? "").trim(),
+      gstin: (input.gstin ?? "").trim(),
+    })
+    .select("id, type, name, address, phone, email, gstin, created_at")
+    .single();
+
+  if (error) throw error;
+  return { ok: true, party: toParty(data) };
+}
+
+/** Updates a party's saved details — does not touch any invoice already billed to them. */
+export async function updateParty(id: number, input: PartyInput): Promise<PartyResult> {
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Name is required." };
+
+  if (isDemoMode()) {
+    return updateDemoParty(id, input);
+  }
+
+  const { data, error } = await getClient()
+    .from("parties")
+    .update({
+      name,
+      address: (input.address ?? "").trim(),
+      phone: (input.phone ?? "").trim(),
+      email: (input.email ?? "").trim(),
+      gstin: (input.gstin ?? "").trim(),
+    })
+    .eq("id", id)
+    .select("id, type, name, address, phone, email, gstin, created_at")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return { ok: false, error: "Party not found." };
+  return { ok: true, party: toParty(data) };
+}
+
+/** A party's own saved details plus every invoice ever billed to them, newest first. */
+export async function getPartyLedger(
+  id: number
+): Promise<{ party: Party; invoices: InvoiceSummary[] } | null> {
+  if (isDemoMode()) {
+    return getDemoPartyLedger(id);
+  }
+
+  const supabase = getClient();
+  const { data: partyRow, error: partyError } = await supabase
+    .from("parties")
+    .select("id, type, name, address, phone, email, gstin, created_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (partyError) throw partyError;
+  if (!partyRow) return null;
+
+  const { data, error } = await supabase
+    .from("invoices")
+    .select(INVOICE_SUMMARY_SELECT)
+    .eq("party_id", id)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return { party: toParty(partyRow), invoices: (data ?? []).map(toInvoiceSummary) };
 }
 
 /** Recent manual stock corrections, newest first — for the Stock Entry audit log. */

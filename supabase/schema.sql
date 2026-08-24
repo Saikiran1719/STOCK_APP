@@ -283,3 +283,138 @@ begin
   where id = p_invoice_id;
 end;
 $$;
+
+-- --------------------------------------------------------------------------
+-- Parties: a reusable customer master instead of retyping name + address on
+-- every invoice. `type` is here now (not just 'customer') so a future
+-- "vendors / purchases" milestone can reuse this same table without another
+-- migration; today only 'customer' rows are ever created.
+-- --------------------------------------------------------------------------
+
+create table if not exists parties (
+  id bigint generated always as identity primary key,
+  type text not null default 'customer',
+  name text not null,
+  address text not null default '',
+  phone text not null default '',
+  email text not null default '',
+  gstin text not null default '',
+  created_at timestamptz not null default now(),
+  constraint parties_type_check check (type in ('customer', 'vendor'))
+);
+
+-- Not a unique constraint — two real customers can share a name — just an
+-- index to make the case-insensitive lookup in place_invoice() below fast.
+create index if not exists parties_name_idx on parties (lower(name));
+
+alter table invoices add column if not exists party_id bigint references parties(id);
+create index if not exists invoices_party_id_idx on invoices(party_id);
+
+-- place_invoice gains a 4th, optional parameter — CREATE OR REPLACE can't
+-- add a parameter to an existing function (Postgres would just create a
+-- second, ambiguous overload), so the old 3-argument version has to be
+-- dropped explicitly first, same as the earlier 2-argument cleanup above.
+-- A no-op once it's already gone.
+drop function if exists place_invoice(text, text, jsonb);
+
+-- Pass p_party_id to bill an existing party directly (picked from the
+-- Dashboard's customer field); omit it and the function resolves one itself
+-- by exact case-insensitive name match, or creates a new party from the
+-- name + address given if nothing matches. Either way the invoice keeps its
+-- own customer_name/customer_address snapshot — it never changes later even
+-- if the party's saved details do.
+create or replace function place_invoice(
+  p_customer_name text,
+  p_customer_address text,
+  p_items jsonb,
+  p_party_id bigint default null
+)
+returns table (invoice_id bigint, invoice_total numeric)
+language plpgsql
+as $$
+declare
+  v_invoice_id bigint;
+  v_party_id bigint;
+  v_item jsonb;
+  v_name text;
+  v_qty integer;
+  v_product products%rowtype;
+  v_item_subtotal numeric;
+  v_item_gst numeric;
+  v_item_total numeric;
+  v_invoice_subtotal numeric := 0;
+  v_invoice_gst numeric := 0;
+  v_invoice_total numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'no_items';
+  end if;
+
+  if p_customer_name is null or btrim(p_customer_name) = '' then
+    raise exception 'customer_name_required';
+  end if;
+
+  if p_customer_address is null or btrim(p_customer_address) = '' then
+    raise exception 'customer_address_required';
+  end if;
+
+  if p_party_id is not null then
+    v_party_id := p_party_id;
+  else
+    select id into v_party_id from parties
+      where type = 'customer' and lower(name) = lower(btrim(p_customer_name))
+      limit 1;
+    if not found then
+      insert into parties (type, name, address)
+      values ('customer', btrim(p_customer_name), btrim(p_customer_address))
+      returning id into v_party_id;
+    end if;
+  end if;
+
+  insert into invoices (customer_name, customer_address, party_id, subtotal, gst_amount, total)
+  values (p_customer_name, p_customer_address, v_party_id, 0, 0, 0)
+  returning id into v_invoice_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_name := v_item->>'name';
+    v_qty := (v_item->>'qty')::integer;
+
+    if v_name is null or v_qty is null or v_qty <= 0 then
+      raise exception 'invalid_item:%', coalesce(v_name, '?');
+    end if;
+
+    select * into v_product from products where products.name = v_name for update;
+
+    if not found then
+      raise exception 'not_found:%', v_name;
+    end if;
+
+    if v_product.stock < v_qty then
+      raise exception 'insufficient_stock:%:%', v_name, v_product.stock;
+    end if;
+
+    update products set stock = products.stock - v_qty where id = v_product.id;
+
+    v_item_subtotal := v_product.cost * v_qty;
+    v_item_gst := v_item_subtotal * v_product.gst_rate / 100;
+    v_item_total := v_item_subtotal + v_item_gst;
+
+    insert into invoice_items
+      (invoice_id, product_id, product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, new_stock)
+    values
+      (v_invoice_id, v_product.id, v_product.name, v_qty, v_product.cost, v_product.gst_rate,
+       v_item_subtotal, v_item_gst, v_item_total, v_product.stock - v_qty);
+
+    v_invoice_subtotal := v_invoice_subtotal + v_item_subtotal;
+    v_invoice_gst := v_invoice_gst + v_item_gst;
+    v_invoice_total := v_invoice_total + v_item_total;
+  end loop;
+
+  update invoices
+  set subtotal = v_invoice_subtotal, gst_amount = v_invoice_gst, total = v_invoice_total
+  where id = v_invoice_id;
+
+  return query select v_invoice_id, v_invoice_total;
+end;
+$$;

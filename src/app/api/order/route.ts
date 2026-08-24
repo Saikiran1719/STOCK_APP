@@ -5,6 +5,7 @@ export async function POST(request: NextRequest) {
   let body: {
     customerName?: string;
     customerAddress?: string;
+    partyId?: number;
     items?: { name?: string; qty?: number }[];
   };
   try {
@@ -18,9 +19,10 @@ export async function POST(request: NextRequest) {
     : [];
   const customerName = typeof body.customerName === "string" ? body.customerName : "";
   const customerAddress = typeof body.customerAddress === "string" ? body.customerAddress : "";
+  const partyId = typeof body.partyId === "number" && Number.isFinite(body.partyId) ? body.partyId : undefined;
 
   try {
-    const result = await placeInvoice(items, customerName, customerAddress);
+    const result = await placeInvoice(items, customerName, customerAddress, partyId);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
