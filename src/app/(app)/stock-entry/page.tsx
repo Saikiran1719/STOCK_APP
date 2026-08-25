@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import ProductAvatar from "@/components/ProductAvatar";
 
-type Product = { id: number; name: string; cost: number; stock: number; gstRate: number };
+type Product = { id: number; name: string; cost: number; stock: number; gstRate: number; hsnCode: string };
 type Message = { type: "ok" | "error"; text: string };
 type Adjustment = {
   id: number;
@@ -14,7 +14,7 @@ type Adjustment = {
   createdAt: string;
 };
 
-const GST_RATES = [5, 18];
+const GST_RATES = [0, 5, 12, 18, 28];
 
 type SectionKey = "add" | "remove" | "edit" | "new";
 
@@ -42,10 +42,11 @@ export default function StockEntryPage() {
   const [removeMessage, setRemoveMessage] = useState<Message | null>(null);
   const [removeSubmitting, setRemoveSubmitting] = useState(false);
 
-  // Edit product form (cost + GST rate)
+  // Edit product form (cost + GST rate + HSN/SAC)
   const [editProduct, setEditProduct] = useState("");
   const [editCost, setEditCost] = useState<number | "">("");
-  const [editGstRate, setEditGstRate] = useState(GST_RATES[1]);
+  const [editGstRate, setEditGstRate] = useState(18);
+  const [editHsnCode, setEditHsnCode] = useState("");
   const [editMessage, setEditMessage] = useState<Message | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
@@ -53,7 +54,8 @@ export default function StockEntryPage() {
   const [newName, setNewName] = useState("");
   const [newCost, setNewCost] = useState<number | "">("");
   const [newStock, setNewStock] = useState<number | "">("");
-  const [newGstRate, setNewGstRate] = useState(GST_RATES[1]);
+  const [newGstRate, setNewGstRate] = useState(18);
+  const [newHsnCode, setNewHsnCode] = useState("");
   const [newMessage, setNewMessage] = useState<Message | null>(null);
   const [newSubmitting, setNewSubmitting] = useState(false);
 
@@ -115,6 +117,7 @@ export default function StockEntryPage() {
     if (product) {
       setEditCost(product.cost);
       setEditGstRate(product.gstRate);
+      setEditHsnCode(product.hsnCode);
     }
   }, [editProduct, products]);
 
@@ -179,7 +182,7 @@ export default function StockEntryPage() {
       const res = await fetch("/api/products", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editProduct, cost: editCost, gstRate: editGstRate }),
+        body: JSON.stringify({ name: editProduct, cost: editCost, gstRate: editGstRate, hsnCode: editHsnCode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -204,7 +207,7 @@ export default function StockEntryPage() {
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName, cost: newCost, stock: newStock, gstRate: newGstRate }),
+        body: JSON.stringify({ name: newName, cost: newCost, stock: newStock, gstRate: newGstRate, hsnCode: newHsnCode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -215,7 +218,8 @@ export default function StockEntryPage() {
       setNewName("");
       setNewCost("");
       setNewStock("");
-      setNewGstRate(GST_RATES[1]);
+      setNewGstRate(18);
+      setNewHsnCode("");
       await loadProducts();
     } finally {
       setNewSubmitting(false);
@@ -452,6 +456,20 @@ export default function StockEntryPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="edit-hsn">
+                    HSN/SAC code <span className="text-muted">(optional)</span>
+                  </label>
+                  <input
+                    id="edit-hsn"
+                    type="text"
+                    value={editHsnCode}
+                    onChange={(e) => setEditHsnCode(e.target.value)}
+                    placeholder="e.g. 8471"
+                    className="w-full max-w-xs rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </div>
+
                 <button
                   type="submit"
                   disabled={editSubmitting || !editProduct || editCost === ""}
@@ -532,6 +550,20 @@ export default function StockEntryPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="new-hsn">
+                  HSN/SAC code <span className="text-muted">(optional)</span>
+                </label>
+                <input
+                  id="new-hsn"
+                  type="text"
+                  value={newHsnCode}
+                  onChange={(e) => setNewHsnCode(e.target.value)}
+                  placeholder="e.g. 8471"
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
               </div>
 
               <div className="flex items-end sm:col-span-2">

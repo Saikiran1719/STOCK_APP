@@ -20,6 +20,7 @@ type Party = {
 
 type Invoice = {
   id: number;
+  invoiceNo: string;
   itemsLabel: string;
   total: number;
   amountPaid: number;
@@ -61,10 +62,6 @@ type PaymentEntry = {
 };
 
 type Message = { type: "ok" | "error"; text: string };
-
-function invoiceNumberFor(id: number) {
-  return `INV-${String(id).padStart(6, "0")}`;
-}
 
 function purchaseNumberFor(id: number) {
   return `PUR-${String(id).padStart(6, "0")}`;
@@ -390,7 +387,7 @@ export default function PartyDetailPage() {
                       className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft ${voided ? "opacity-50" : ""}`}
                     >
                       <Td className="font-medium text-ink">
-                        <span className={voided ? "line-through" : ""}>{invoiceNumberFor(inv.id)}</span>
+                        <span className={voided ? "line-through" : ""}>{inv.invoiceNo}</span>
                         {voided && (
                           <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
                             ⊘ Voided

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ProductAvatar from "@/components/ProductAvatar";
 
-type Product = { id: number; name: string; cost: number; stock: number; gstRate: number };
+type Product = { id: number; name: string; cost: number; stock: number; gstRate: number; hsnCode: string };
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -80,6 +80,7 @@ export default function StockPage() {
                 <thead>
                   <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
                     <Th>Product</Th>
+                    <Th>HSN/SAC</Th>
                     <Th align="right">Cost</Th>
                     <Th align="right">GST</Th>
                     <Th align="right">In stock</Th>
@@ -95,6 +96,7 @@ export default function StockPage() {
                           {p.name}
                         </div>
                       </Td>
+                      <Td className="text-muted">{p.hsnCode || "—"}</Td>
                       <Td align="right" className="text-muted">
                         {currency}
                         {p.cost.toLocaleString()}

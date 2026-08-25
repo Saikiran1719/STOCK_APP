@@ -36,6 +36,7 @@ type PurchaseItem = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  hsnCode: string;
 };
 
 type Purchase = {
@@ -240,6 +241,7 @@ export default function PurchaseDetailPage() {
             <thead>
               <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
                 <Th>Product</Th>
+                <Th>HSN/SAC</Th>
                 <Th align="right">Qty</Th>
                 <Th align="right">Cost / unit</Th>
                 <Th align="right">GST</Th>
@@ -250,6 +252,7 @@ export default function PurchaseDetailPage() {
               {purchase.items.map((item, i) => (
                 <tr key={i} className={i % 2 === 1 ? "bg-stripe" : ""}>
                   <Td className="font-medium text-ink">{item.productName}</Td>
+                  <Td className="text-muted">{item.hsnCode || "—"}</Td>
                   <Td align="right" className="text-muted">
                     {item.qty}
                   </Td>

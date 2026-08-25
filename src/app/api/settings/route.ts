@@ -28,6 +28,7 @@ export async function PUT(request: NextRequest) {
     currencySymbol: typeof body.currencySymbol === "string" ? body.currencySymbol : "",
     invoiceNote: typeof body.invoiceNote === "string" ? body.invoiceNote : "",
     logoDataUrl: typeof body.logoDataUrl === "string" ? body.logoDataUrl : "",
+    invoicePrefix: typeof body.invoicePrefix === "string" ? body.invoicePrefix : "INV",
   };
 
   try {

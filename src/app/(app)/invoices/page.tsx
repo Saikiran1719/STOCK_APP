@@ -8,6 +8,7 @@ type InvoiceStatus = "active" | "voided";
 
 type Invoice = {
   id: number;
+  invoiceNo: string;
   partyId: number | null;
   customerName: string;
   customerAddress: string;
@@ -27,10 +28,6 @@ function toDateInputValue(iso: string) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function invoiceNumberFor(id: number) {
-  return `INV-${String(id).padStart(6, "0")}`;
 }
 
 export default function InvoicesPage() {
@@ -79,7 +76,7 @@ export default function InvoicesPage() {
     return invoices.filter((inv) => {
       if (dateFilter && toDateInputValue(inv.createdAt) !== dateFilter) return false;
       if (q) {
-        const haystack = `${inv.customerName} ${inv.customerAddress} ${inv.itemsLabel}`.toLowerCase();
+        const haystack = `${inv.invoiceNo} ${inv.customerName} ${inv.customerAddress} ${inv.itemsLabel}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -225,7 +222,7 @@ export default function InvoicesPage() {
                           className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft ${voided ? "opacity-50" : ""}`}
                         >
                           <Td className="font-medium text-ink">
-                            <span className={voided ? "line-through" : ""}>{invoiceNumberFor(inv.id)}</span>
+                            <span className={voided ? "line-through" : ""}>{inv.invoiceNo}</span>
                             {voided && (
                               <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
                                 ⊘ Voided

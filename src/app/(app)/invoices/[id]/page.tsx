@@ -37,10 +37,12 @@ type InvoiceItem = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  hsnCode: string;
 };
 
 type Invoice = {
   id: number;
+  invoiceNo: string;
   partyId: number | null;
   customerName: string;
   customerAddress: string;
@@ -67,10 +69,6 @@ type Settings = {
   invoiceNote: string;
   logoDataUrl: string;
 };
-
-function invoiceNumberFor(id: number) {
-  return `INV-${String(id).padStart(6, "0")}`;
-}
 
 export default function InvoicePage() {
   const params = useParams<{ id: string }>();
@@ -107,7 +105,7 @@ export default function InvoicePage() {
       }
       setInvoice(data.invoice);
       setSettings(data.settings);
-      document.title = `Invoice No: ${invoiceNumberFor(data.invoice.id)}`;
+      document.title = `Invoice No: ${data.invoice.invoiceNo}`;
 
       const payRes = await fetch(`/api/payments?invoiceId=${params.id}`);
       if (payRes.ok) {
@@ -193,7 +191,7 @@ export default function InvoicePage() {
     );
   }
 
-  const invoiceNumber = invoiceNumberFor(invoice.id);
+  const invoiceNumber = invoice.invoiceNo;
   const date = new Date(invoice.createdAt).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -294,11 +292,12 @@ export default function InvoicePage() {
 
         {/* Line items */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="bg-head">
                 <Th className="text-left">#</Th>
                 <Th className="text-left">Description</Th>
+                <Th className="text-left">HSN/SAC</Th>
                 <Th className="text-right">Qty</Th>
                 <Th className="text-right">Rate</Th>
                 <Th className="text-right">Taxable Value</Th>
@@ -315,6 +314,7 @@ export default function InvoicePage() {
                   <tr key={i}>
                     <Td className="text-left">{i + 1}</Td>
                     <Td className="text-left font-medium">{item.productName}</Td>
+                    <Td className="text-left text-ink/70">{item.hsnCode || "—"}</Td>
                     <Td className="text-right">{item.qty}</Td>
                     <Td className="text-right">{money(item.unitCost)}</Td>
                     <Td className="text-right">{money(item.subtotal)}</Td>

@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-/** The only GST slabs this app offers, per how the business actually prices items. */
-export const GST_RATES = [5, 18] as const;
+/** The GST slabs this app offers — the full standard Indian set, not just what the seed products happened to use. */
+export const GST_RATES = [0, 5, 12, 18, 28] as const;
 
 export type Product = {
   id: number;
@@ -9,6 +9,7 @@ export type Product = {
   cost: number;
   stock: number;
   gstRate: number;
+  hsnCode: string;
 };
 
 export type Settings = {
@@ -20,6 +21,7 @@ export type Settings = {
   currencySymbol: string;
   invoiceNote: string;
   logoDataUrl: string;
+  invoicePrefix: string;
 };
 
 export type InvoiceItemInput = { name: string; qty: number };
@@ -32,6 +34,7 @@ export type InvoiceItem = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  hsnCode: string;
 };
 
 export type PaymentStatus = "unpaid" | "partial" | "paid";
@@ -39,6 +42,7 @@ export type InvoiceStatus = "active" | "voided";
 
 export type InvoiceSummary = {
   id: number;
+  invoiceNo: string;
   partyId: number | null;
   customerName: string;
   customerAddress: string;
@@ -54,6 +58,7 @@ export type InvoiceSummary = {
 
 export type InvoiceDetail = {
   id: number;
+  invoiceNo: string;
   partyId: number | null;
   customerName: string;
   customerAddress: string;
@@ -69,6 +74,11 @@ export type InvoiceDetail = {
   createdAt: string;
   items: InvoiceItem[];
 };
+
+/** Legacy fallback for invoices placed before the invoice_no migration — never used for a new invoice. */
+function legacyInvoiceNo(id: number) {
+  return `INV-${String(id).padStart(6, "0")}`;
+}
 
 /**
  * A reusable customer (or, later, vendor) master — saved once, billed
@@ -114,6 +124,7 @@ export type PurchaseItem = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  hsnCode: string;
 };
 
 export type PurchaseSummary = {
@@ -167,6 +178,24 @@ export type GstRateBreakdown = {
   total: number;
 };
 
+/** One row of a GSTR-1-style HSN summary (return Table 12) — grouped by HSN/SAC + the rate it was billed at. */
+export type HsnBreakdown = {
+  hsnCode: string;
+  gstRate: number;
+  qty: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+};
+
+/** Invoice count + totals for one GSTR-1 supply category — B2B (billed to a party with a GSTIN) or B2C (no GSTIN on file). */
+export type SupplyCategoryTotals = {
+  invoiceCount: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+};
+
 export type ReportSummary = {
   invoiceCount: number;
   subtotal: number;
@@ -175,6 +204,9 @@ export type ReportSummary = {
   amountPaid: number;
   amountOutstanding: number;
   byGstRate: GstRateBreakdown[];
+  byHsn: HsnBreakdown[];
+  b2b: SupplyCategoryTotals;
+  b2c: SupplyCategoryTotals;
 };
 
 export type PlaceInvoiceResult =
@@ -229,6 +261,7 @@ const DEFAULT_SETTINGS: Settings = {
   currencySymbol: "",
   invoiceNote: "Thank you for your business.",
   logoDataUrl: "",
+  invoicePrefix: "INV",
 };
 
 /** Hard cap on the stored logo — keeps a single settings row reasonable in size. */
@@ -252,9 +285,9 @@ export function isDemoMode(): boolean {
 
 // --- Demo data store (mirrors the seed data in supabase/schema.sql) ---
 let demoProducts: Product[] = [
-  { id: 1, name: "MOUSE", cost: 500, stock: 100, gstRate: 18 },
-  { id: 2, name: "KEYBOARD", cost: 1000, stock: 50, gstRate: 18 },
-  { id: 3, name: "MONITER", cost: 5000, stock: 5, gstRate: 18 },
+  { id: 1, name: "MOUSE", cost: 500, stock: 100, gstRate: 18, hsnCode: "8471" },
+  { id: 2, name: "KEYBOARD", cost: 1000, stock: 50, gstRate: 18, hsnCode: "8471" },
+  { id: 3, name: "MONITER", cost: 5000, stock: 5, gstRate: 18, hsnCode: "8471" },
 ];
 let demoInvoices: InvoiceDetail[] = [];
 let demoPurchases: PurchaseDetail[] = [];
@@ -271,6 +304,21 @@ let demoNextPaymentId = 1;
 /** Shared by getPayments()'s real and demo paths — narrows the ledger to one party/invoice/purchase, or leaves it as the whole history. */
 export type PaymentFilter = { partyId?: number; invoiceId?: number; purchaseId?: number };
 let demoSettings: Settings = { ...DEFAULT_SETTINGS };
+
+// fy_label -> next number to hand out, mirroring the invoice_number_counters
+// table's atomic-upsert behavior for the real backend.
+const demoInvoiceCounters = new Map<string, number>();
+
+/** Indian financial year (Apr-Mar) as "25-26", plus the next sequential number for it — the demo-mode mirror of place_invoice()'s numbering logic. */
+function nextDemoInvoiceNo(prefix: string): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const fyStart = now.getMonth() >= 3 ? y : y - 1; // getMonth() is 0-based; April = 3
+  const fyLabel = `${String(fyStart % 100).padStart(2, "0")}-${String((fyStart + 1) % 100).padStart(2, "0")}`;
+  const seq = demoInvoiceCounters.get(fyLabel) ?? 1;
+  demoInvoiceCounters.set(fyLabel, seq + 1);
+  return `${prefix || "INV"}/${fyLabel}/${String(seq).padStart(5, "0")}`;
+}
 
 function getDemoProducts(): Product[] {
   return demoProducts.map((p) => ({ ...p }));
@@ -431,6 +479,7 @@ function placeDemoInvoice(
       subtotal: lineSubtotal,
       gstAmount: lineGst,
       total: lineTotal,
+      hsnCode: product.hsnCode,
     });
     grossSubtotal += grossLine;
     subtotal += lineSubtotal;
@@ -444,6 +493,7 @@ function placeDemoInvoice(
 
   const invoice: InvoiceDetail = {
     id: demoNextInvoiceId++,
+    invoiceNo: nextDemoInvoiceNo(demoSettings.invoicePrefix),
     partyId: resolvedParty?.id ?? null,
     customerName: customerName.trim(),
     customerAddress: customerAddress.trim(),
@@ -470,6 +520,7 @@ function getDemoInvoices(): InvoiceSummary[] {
     .reverse()
     .map((inv) => ({
       id: inv.id,
+      invoiceNo: inv.invoiceNo,
       partyId: inv.partyId,
       customerName: inv.customerName,
       customerAddress: inv.customerAddress,
@@ -593,6 +644,7 @@ function placeDemoPurchase(
       subtotal: lineSubtotal,
       gstAmount: lineGst,
       total: lineTotal,
+      hsnCode: product.hsnCode,
     });
     subtotal += lineSubtotal;
     gstAmount += lineGst;
@@ -725,16 +777,26 @@ function getDemoReportSummary(fromISO: string, toISO: string): ReportSummary {
   );
 
   const byRate = new Map<number, GstRateBreakdown>();
+  const byHsn = new Map<string, HsnBreakdown>();
   let subtotal = 0;
   let gstAmount = 0;
   let total = 0;
   let amountPaid = 0;
+  const b2b: SupplyCategoryTotals = { invoiceCount: 0, subtotal: 0, gstAmount: 0, total: 0 };
+  const b2c: SupplyCategoryTotals = { invoiceCount: 0, subtotal: 0, gstAmount: 0, total: 0 };
 
   for (const inv of inRange) {
     subtotal += inv.subtotal;
     gstAmount += inv.gstAmount;
     total += inv.total;
     amountPaid += inv.amountPaid;
+
+    const party = inv.partyId != null ? demoParties.find((p) => p.id === inv.partyId) : null;
+    const bucket2 = party?.gstin.trim() ? b2b : b2c;
+    bucket2.invoiceCount += 1;
+    bucket2.subtotal += inv.subtotal;
+    bucket2.gstAmount += inv.gstAmount;
+    bucket2.total += inv.total;
 
     for (const item of inv.items) {
       const bucket = byRate.get(item.gstRate) ?? {
@@ -747,6 +809,21 @@ function getDemoReportSummary(fromISO: string, toISO: string): ReportSummary {
       bucket.gstAmount += item.gstAmount;
       bucket.total += item.total;
       byRate.set(item.gstRate, bucket);
+
+      const hsnKey = `${item.hsnCode || "—"}|${item.gstRate}`;
+      const hsnBucket = byHsn.get(hsnKey) ?? {
+        hsnCode: item.hsnCode || "—",
+        gstRate: item.gstRate,
+        qty: 0,
+        subtotal: 0,
+        gstAmount: 0,
+        total: 0,
+      };
+      hsnBucket.qty += item.qty;
+      hsnBucket.subtotal += item.subtotal;
+      hsnBucket.gstAmount += item.gstAmount;
+      hsnBucket.total += item.total;
+      byHsn.set(hsnKey, hsnBucket);
     }
   }
 
@@ -758,6 +835,9 @@ function getDemoReportSummary(fromISO: string, toISO: string): ReportSummary {
     amountPaid,
     amountOutstanding: total - amountPaid,
     byGstRate: Array.from(byRate.values()).sort((a, b) => a.gstRate - b.gstRate),
+    byHsn: Array.from(byHsn.values()).sort((a, b) => a.hsnCode.localeCompare(b.hsnCode)),
+    b2b,
+    b2c,
   };
 }
 
@@ -765,13 +845,14 @@ function createDemoProduct(
   name: string,
   cost: number,
   stock: number,
-  gstRate: number
+  gstRate: number,
+  hsnCode: string
 ): ProductResult {
   const exists = demoProducts.some((p) => p.name.toLowerCase() === name.toLowerCase());
   if (exists) {
     return { ok: false, error: `Product "${name}" already exists.` };
   }
-  const product: Product = { id: demoNextProductId++, name, cost, stock, gstRate };
+  const product: Product = { id: demoNextProductId++, name, cost, stock, gstRate, hsnCode };
   demoProducts.push(product);
   return { ok: true, product };
 }
@@ -805,13 +886,14 @@ function removeDemoStock(name: string, qty: number, remarks: string): ProductRes
   return { ok: true, product: { ...product } };
 }
 
-function updateDemoProduct(name: string, cost: number, gstRate: number): ProductResult {
+function updateDemoProduct(name: string, cost: number, gstRate: number, hsnCode: string): ProductResult {
   const product = demoProducts.find((p) => p.name.toLowerCase() === name.toLowerCase());
   if (!product) {
     return { ok: false, error: `Product "${name}" was not found.` };
   }
   product.cost = cost;
   product.gstRate = gstRate;
+  product.hsnCode = hsnCode;
   return { ok: true, product: { ...product } };
 }
 
@@ -824,6 +906,10 @@ function toProduct(row: {
   cost: unknown;
   stock: number;
   gst_rate: unknown;
+  // Optional: increment_stock/decrement_stock (restock, manual removal)
+  // don't select hsn_code — those flows don't need it, and adding it there
+  // would mean another RETURNS TABLE signature change for no real benefit.
+  hsn_code?: string | null;
 }): Product {
   return {
     id: row.id,
@@ -831,6 +917,7 @@ function toProduct(row: {
     cost: Number(row.cost),
     stock: row.stock,
     gstRate: Number(row.gst_rate),
+    hsnCode: row.hsn_code ?? "",
   };
 }
 
@@ -903,7 +990,7 @@ export async function getProducts(): Promise<Product[]> {
 
   const { data, error } = await getClient()
     .from("products")
-    .select("id, name, cost, stock, gst_rate")
+    .select("id, name, cost, stock, gst_rate, hsn_code")
     .order("name", { ascending: true });
 
   if (error) throw error;
@@ -914,7 +1001,8 @@ export async function createProduct(
   name: string,
   cost: number,
   stock: number,
-  gstRate: number
+  gstRate: number,
+  hsnCode = ""
 ): Promise<ProductResult> {
   if (!name.trim()) return { ok: false, error: "Product name is required." };
   if (!Number.isFinite(cost) || cost < 0) return { ok: false, error: "Cost must be 0 or more." };
@@ -926,13 +1014,13 @@ export async function createProduct(
   }
 
   if (isDemoMode()) {
-    return createDemoProduct(name.trim(), cost, stock, gstRate);
+    return createDemoProduct(name.trim(), cost, stock, gstRate, hsnCode.trim());
   }
 
   const { data, error } = await getClient()
     .from("products")
-    .insert({ name: name.trim(), cost, stock, gst_rate: gstRate })
-    .select("id, name, cost, stock, gst_rate")
+    .insert({ name: name.trim(), cost, stock, gst_rate: gstRate, hsn_code: hsnCode.trim() })
+    .select("id, name, cost, stock, gst_rate, hsn_code")
     .single();
 
   if (error) {
@@ -1017,11 +1105,12 @@ export async function removeStock(
   return { ok: true, product: toProduct(row) };
 }
 
-/** Sets a product's cost and GST rate — used by the Stock Entry "Edit product" form. */
+/** Sets a product's cost, GST rate, and HSN/SAC code — used by the Stock Entry "Edit product" form. */
 export async function updateProduct(
   name: string,
   cost: number,
-  gstRate: number
+  gstRate: number,
+  hsnCode = ""
 ): Promise<ProductResult> {
   if (!Number.isFinite(cost) || cost < 0) {
     return { ok: false, error: "Cost must be 0 or more." };
@@ -1031,14 +1120,14 @@ export async function updateProduct(
   }
 
   if (isDemoMode()) {
-    return updateDemoProduct(name, cost, gstRate);
+    return updateDemoProduct(name, cost, gstRate, hsnCode.trim());
   }
 
   const { data, error } = await getClient()
     .from("products")
-    .update({ cost, gst_rate: gstRate })
+    .update({ cost, gst_rate: gstRate, hsn_code: hsnCode.trim() })
     .eq("name", name)
-    .select("id, name, cost, stock, gst_rate")
+    .select("id, name, cost, stock, gst_rate, hsn_code")
     .maybeSingle();
 
   if (error) throw error;
@@ -1111,10 +1200,11 @@ export async function placeInvoice(
 }
 
 const INVOICE_SUMMARY_SELECT =
-  "id, party_id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, created_at, invoice_items(product_name, qty)";
+  "id, invoice_no, party_id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, created_at, invoice_items(product_name, qty)";
 
 type InvoiceSummaryRow = {
   id: number;
+  invoice_no: string | null;
   party_id: number | null;
   customer_name: string | null;
   customer_address: string | null;
@@ -1132,6 +1222,7 @@ function toInvoiceSummary(inv: InvoiceSummaryRow): InvoiceSummary {
   const amountPaid = Number(inv.amount_paid ?? 0);
   return {
     id: inv.id,
+    invoiceNo: inv.invoice_no || legacyInvoiceNo(inv.id),
     partyId: inv.party_id ?? null,
     customerName: inv.customer_name ?? "",
     customerAddress: inv.customer_address ?? "",
@@ -1168,7 +1259,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
   const { data, error } = await getClient()
     .from("invoices")
     .select(
-      "id, party_id, customer_name, customer_address, subtotal, gst_amount, total, discount_percent, discount_amount, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+      "id, invoice_no, party_id, customer_name, customer_address, subtotal, gst_amount, total, discount_percent, discount_amount, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, hsn_code)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -1184,6 +1275,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
     subtotal: unknown;
     gst_amount: unknown;
     total: unknown;
+    hsn_code: string | null;
   };
 
   const total = Number(data.total);
@@ -1191,6 +1283,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
 
   return {
     id: data.id,
+    invoiceNo: data.invoice_no || legacyInvoiceNo(data.id),
     partyId: data.party_id ?? null,
     customerName: data.customer_name ?? "",
     customerAddress: data.customer_address ?? "",
@@ -1212,6 +1305,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
       subtotal: Number(it.subtotal),
       gstAmount: Number(it.gst_amount),
       total: Number(it.total),
+      hsnCode: it.hsn_code ?? "",
     })),
   };
 }
@@ -1411,7 +1505,7 @@ export async function getPurchaseById(id: number): Promise<PurchaseDetail | null
   const { data, error } = await getClient()
     .from("purchases")
     .select(
-      "id, party_id, vendor_name, vendor_ref, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, purchase_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+      "id, party_id, vendor_name, vendor_ref, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, purchase_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, hsn_code)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -1427,6 +1521,7 @@ export async function getPurchaseById(id: number): Promise<PurchaseDetail | null
     subtotal: unknown;
     gst_amount: unknown;
     total: unknown;
+    hsn_code: string | null;
   };
 
   const total = Number(data.total);
@@ -1453,6 +1548,7 @@ export async function getPurchaseById(id: number): Promise<PurchaseDetail | null
       subtotal: Number(it.subtotal),
       gstAmount: Number(it.gst_amount),
       total: Number(it.total),
+      hsnCode: it.hsn_code ?? "",
     })),
   };
 }
@@ -1812,10 +1908,11 @@ export async function getReportSummary(fromISO: string, toISO: string): Promise<
     return getDemoReportSummary(fromISO, toISO);
   }
 
-  const { data, error } = await getClient()
+  const supabase = getClient();
+  const { data, error } = await supabase
     .from("invoices")
     .select(
-      "subtotal, gst_amount, total, amount_paid, invoice_items(gst_rate, subtotal, gst_amount, total)"
+      "party_id, subtotal, gst_amount, total, amount_paid, invoice_items(hsn_code, gst_rate, qty, subtotal, gst_amount, total)"
     )
     .eq("status", "active")
     .gte("created_at", fromISO)
@@ -1824,19 +1921,44 @@ export async function getReportSummary(fromISO: string, toISO: string): Promise<
   if (error) throw error;
 
   const rows = data ?? [];
+
+  // B2B vs B2C (GSTR-1 Tables 4 and 7) hinges on whether the billed party
+  // has a GSTIN on file — a second query for just the parties this range
+  // actually touched, same two-query-then-merge pattern getParties() uses.
+  const partyIds = Array.from(new Set(rows.map((r) => r.party_id).filter((id): id is number => id != null)));
+  const gstinByParty = new Map<number, string>();
+  if (partyIds.length > 0) {
+    const { data: partyRows, error: partyError } = await supabase.from("parties").select("id, gstin").in("id", partyIds);
+    if (partyError) throw partyError;
+    for (const p of partyRows ?? []) gstinByParty.set(p.id, p.gstin ?? "");
+  }
+
   const byRate = new Map<number, GstRateBreakdown>();
+  const byHsn = new Map<string, HsnBreakdown>();
   let subtotal = 0;
   let gstAmount = 0;
   let total = 0;
   let amountPaid = 0;
+  const b2b: SupplyCategoryTotals = { invoiceCount: 0, subtotal: 0, gstAmount: 0, total: 0 };
+  const b2c: SupplyCategoryTotals = { invoiceCount: 0, subtotal: 0, gstAmount: 0, total: 0 };
 
-  type ItemRow = { gst_rate: unknown; subtotal: unknown; gst_amount: unknown; total: unknown };
+  type ItemRow = { hsn_code: string | null; gst_rate: unknown; qty: number; subtotal: unknown; gst_amount: unknown; total: unknown };
 
   for (const inv of rows) {
-    subtotal += Number(inv.subtotal);
-    gstAmount += Number(inv.gst_amount);
-    total += Number(inv.total);
+    const invSubtotal = Number(inv.subtotal);
+    const invGst = Number(inv.gst_amount);
+    const invTotal = Number(inv.total);
+    subtotal += invSubtotal;
+    gstAmount += invGst;
+    total += invTotal;
     amountPaid += Number(inv.amount_paid ?? 0);
+
+    const hasGstin = inv.party_id != null && (gstinByParty.get(inv.party_id) || "").trim() !== "";
+    const bucket2 = hasGstin ? b2b : b2c;
+    bucket2.invoiceCount += 1;
+    bucket2.subtotal += invSubtotal;
+    bucket2.gstAmount += invGst;
+    bucket2.total += invTotal;
 
     for (const item of (inv.invoice_items ?? []) as ItemRow[]) {
       const rate = Number(item.gst_rate);
@@ -1845,6 +1967,15 @@ export async function getReportSummary(fromISO: string, toISO: string): Promise<
       bucket.gstAmount += Number(item.gst_amount);
       bucket.total += Number(item.total);
       byRate.set(rate, bucket);
+
+      const hsnCode = item.hsn_code || "—";
+      const hsnKey = `${hsnCode}|${rate}`;
+      const hsnBucket = byHsn.get(hsnKey) ?? { hsnCode, gstRate: rate, qty: 0, subtotal: 0, gstAmount: 0, total: 0 };
+      hsnBucket.qty += item.qty;
+      hsnBucket.subtotal += Number(item.subtotal);
+      hsnBucket.gstAmount += Number(item.gst_amount);
+      hsnBucket.total += Number(item.total);
+      byHsn.set(hsnKey, hsnBucket);
     }
   }
 
@@ -1856,6 +1987,9 @@ export async function getReportSummary(fromISO: string, toISO: string): Promise<
     amountPaid,
     amountOutstanding: total - amountPaid,
     byGstRate: Array.from(byRate.values()).sort((a, b) => a.gstRate - b.gstRate),
+    byHsn: Array.from(byHsn.values()).sort((a, b) => a.hsnCode.localeCompare(b.hsnCode)),
+    b2b,
+    b2c,
   };
 }
 
@@ -1866,7 +2000,7 @@ export async function getSettings(): Promise<Settings> {
 
   const { data, error } = await getClient()
     .from("company_settings")
-    .select("company_name, address, phone, email, gstin, currency_symbol, invoice_note, logo_data_url")
+    .select("company_name, address, phone, email, gstin, currency_symbol, invoice_note, logo_data_url, invoice_prefix")
     .eq("id", 1)
     .maybeSingle();
 
@@ -1882,6 +2016,7 @@ export async function getSettings(): Promise<Settings> {
     currencySymbol: data.currency_symbol ?? "",
     invoiceNote: data.invoice_note ?? "",
     logoDataUrl: data.logo_data_url ?? "",
+    invoicePrefix: data.invoice_prefix || "INV",
   };
 }
 
@@ -1907,6 +2042,7 @@ export async function saveSettings(settings: Settings): Promise<{ ok: true } | {
       currency_symbol: settings.currencySymbol,
       logo_data_url: settings.logoDataUrl || null,
       invoice_note: settings.invoiceNote,
+      invoice_prefix: settings.invoicePrefix || "INV",
       updated_at: new Date().toISOString(),
     });
 

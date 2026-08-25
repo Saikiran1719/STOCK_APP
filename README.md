@@ -1,13 +1,16 @@
 # CounterBook
 
 A billing and stock console: build a sale on an invoice-style entry grid (pick items,
-qty, an optional discount — price and GST fill in automatically) and create a printable
-GST invoice that reduces stock, record vendor purchases (stocks in with a real cost and
-vendor on record), collect/pay money with a mode (cash/bank/UPI/cheque/other) and a
-running Cash & Bank ledger, void mistaken invoices/purchases, browse/reprint every
-invoice ever placed, run monthly GST/sales reports, manage stock/products/GST rates, and
-keep a reusable party master — customers and vendors alike — with a running ledger per
-party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
+qty, an optional discount — price and GST fill in automatically) and create a printable,
+GST-compliant invoice (HSN/SAC codes, the full 0/5/12/18/28% rate slabs, a proper
+financial-year invoice numbering series) that reduces stock, record vendor purchases
+(stocks in with a real cost and vendor on record), collect/pay money with a mode
+(cash/bank/UPI/cheque/other) and a running Cash & Bank ledger, void mistaken
+invoices/purchases, browse/reprint every invoice ever placed, run monthly GST/sales
+reports (including a GSTR-1-style HSN summary and a B2B/B2C split), manage
+stock/products/GST rates, and keep a reusable party master — customers and vendors
+alike — with a running ledger per party — all backed by Supabase (Postgres).
+Password-gated, deployed on Vercel.
 
 ## Look and feel
 
@@ -42,8 +45,9 @@ party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
 - `src/lib/db.ts` — talks to Supabase via `@supabase/supabase-js` using the service-role
   key (server-side only).
   - `getProducts()` / `createProduct()` / `updateProduct()` read/write the `products`
-    table (`updateProduct` sets cost and GST rate together, from Stock Entry's "Edit
-    product" form).
+    table (`updateProduct` sets cost, GST rate, and HSN/SAC code together, from Stock
+    Entry's "Edit product" form). `GST_RATES` is the full standard Indian slab set —
+    `0/5/12/18/28`, not just the two the seed products happened to use.
   - `placeInvoice()` calls the `place_invoice` Postgres function (see
     `supabase/schema.sql`), which runs a whole multi-item order — every item's stock
     check, stock decrement, and line row, plus the invoice header — as **one
@@ -53,8 +57,18 @@ party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
     applied to every line's gross amount *before* that line's own GST is computed (the
     order GST rules require), so a mix of 5%/18% items on one invoice still taxes each
     item correctly on its own discounted base. `unit_cost` stored per line stays the
-    original rate; `subtotal` is the discounted taxable value. `getInvoices()` /
-    `getInvoiceById()` read invoices back for the list and reprint screens.
+    original rate; `subtotal` is the discounted taxable value. Each line also freezes the
+    product's HSN/SAC code at the time of sale (same reasoning as `unit_cost`/`gst_rate`
+    — a later HSN edit shouldn't rewrite an old invoice). The invoice itself is assigned a
+    real `invoice_no` at insert time — `{prefix}/{FY}/{00001}` (e.g. `INV/25-26/00042`),
+    prefix configurable from Settings, sequence per financial year (Apr–Mar) via an
+    atomic upsert-and-read-back counter (`invoice_number_counters`) so two invoices
+    placed at the same moment can never collide on a number — not the raw database id,
+    which is what GST rule 46 (consecutive, unique-per-FY numbering) actually expects.
+    Invoices placed before this existed keep `invoice_no = null` and fall back to the old
+    `INV-000123` display format, so they don't appear to change number after the fact.
+    `getInvoices()` / `getInvoiceById()` read invoices back for the list and reprint
+    screens.
   - `recordInvoicePayment()` calls the `record_invoice_payment` Postgres function: adds
     an amount (with a mode and optional reference) to what's already been paid and logs
     it to the `payments` table, atomically — not a "type the new total" overwrite, so
@@ -77,10 +91,14 @@ party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
     (`removeStock` requires remarks and logs to `stock_adjustments`, readable via
     `getStockAdjustments()`).
   - `getReportSummary()` aggregates active (non-voided) invoices in a date range: total
-    sales, GST collected, amount received/outstanding, and a breakdown by GST rate slab
-    — the numbers a monthly GST return needs.
+    sales, GST collected, amount received/outstanding, a breakdown by GST rate slab, a
+    GSTR-1-style HSN/SAC summary (Table 12 — grouped by HSN code + rate, with quantity),
+    and a B2B/B2C split (Tables 4/7 — whether the billed party has a GSTIN on file,
+    fetched in a second query keyed off the invoices actually in range) — the numbers a
+    monthly GST return needs, not just a sales total.
   - `getSettings()` / `saveSettings()` read/write the single-row `company_settings`
-    table (company name, address, GSTIN, currency symbol, invoice footer note, logo).
+    table (company name, address, GSTIN, currency symbol, invoice footer note, logo,
+    invoice number prefix).
   - `getParties()` / `createParty()` / `updateParty()` / `getPartyLedger()` manage the
     `parties` table — a reusable customer master instead of retyping name/address on
     every sale. `placeInvoice()` takes an optional `partyId`: pass one to bill a party
@@ -138,8 +156,8 @@ party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
     purchase recorded against them if they're a vendor, newest first, linking through to
     each one's detail/print view — and, below that, every payment ever collected from or
     paid to them, with its mode and reference.
-  - `stock/page.tsx` — **Stock**: every product's cost, GST rate, current stock and
-    status, in a searchable bordered/striped table.
+  - `stock/page.tsx` — **Stock**: every product's HSN/SAC code, cost, GST rate, current
+    stock and status, in a searchable bordered/striped table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
     date filter, a customer/product search box, and a payment-status column — find one
     and reprint it. A customer name links through to their party page when the invoice
@@ -154,8 +172,9 @@ party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
   - `invoices/[id]/page.tsx` — the printable invoice itself (client-rendered, fetches
     from `/api/invoices/[id]`; the sidebar and back/print controls are hidden via
     `print:` classes when actually printed — use the Print button, or the browser's own
-    print dialog / Ctrl+P). Sets the page title to `Invoice No: INV-000123`, which
-    browsers use as the print header and default PDF filename. Below the invoice
+    print dialog / Ctrl+P). Line items carry an HSN/SAC column, same as a real GST tax
+    invoice. Sets the page title to `Invoice No: {prefix}/{FY}/{00001}`, which browsers
+    use as the print header and default PDF filename. Below the invoice
     (screen only): a "Record payment" form (amount, mode, optional reference — adds to
     what's already paid rather than overwriting it, and lists that invoice's own payment
     history underneath) and a "Void invoice" control (asks for a reason, then restores
@@ -167,26 +186,33 @@ party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
     product's own price as a starting guess, but editable — the whole point is recording
     what you really paid). Submitting stocks in every item and goes straight to the new
     purchase's detail screen.
-  - `purchases/[id]/page.tsx` — a purchase's line items and totals (CGST/SGST split,
-    same as an invoice), plus screen-only "Record payment" (same amount/mode/reference
-    form and payment-history list as the invoice page) and "Void purchase" controls —
-    voiding reverses the stock this purchase added instead of restoring it.
+  - `purchases/[id]/page.tsx` — a purchase's line items (with the same HSN/SAC column)
+    and totals (CGST/SGST split, same as an invoice), plus screen-only "Record payment"
+    (same amount/mode/reference form and payment-history list as the invoice page) and
+    "Void purchase" controls — voiding reverses the stock this purchase added instead of
+    restoring it.
   - `payments/page.tsx` — **Cash & Bank**: every payment ever recorded, across every
     invoice and purchase, as one ledger — In/Out pills, party, the invoice/purchase it
     was against, mode, reference, and a running balance computed chronologically (so
     filtering the view never changes the historical numbers). Filter by type, mode, date,
     or a party/reference search; three tiles up top total in / total out / net balance.
   - `reports/page.tsx` — **Reports**: pick a month, see invoice count, taxable sales,
-    GST collected, amount received/outstanding, and a per-GST-rate breakdown.
+    GST collected, amount received/outstanding, a B2B-vs-B2C split, a per-GST-rate
+    breakdown, and a GSTR-1-style HSN/SAC summary table — everything a CA would ask for
+    when filing that month's return.
   - `stock-entry/page.tsx` — **Stock Entry**: add stock, remove stock (with required
     remarks, for physical count corrections — logged and shown in a "Recent stock
-    adjustments" table on the same page), edit a product's price/GST rate, or register a
-    new product.
-  - `settings/page.tsx` — **Settings**: company details used on invoices.
+    adjustments" table on the same page), edit a product's price/GST rate/HSN code, or
+    register a new product. The GST rate dropdown offers the full 0/5/12/18/28% slab set.
+  - `settings/page.tsx` — **Settings**: company details used on invoices, plus an
+    invoice number prefix (default `INV`) — new invoices look like
+    `{prefix}/{FY}/{00001}`, with a live preview of the current financial year's format.
 - `src/app/login/page.tsx` — the password screen.
 
-GST: each product has a rate (5% or 18%, set from Stock Entry). Invoices split each
-item's GST evenly into CGST + SGST on the printed invoice — the standard format for an
+GST: each product has a rate (0/5/12/18/28%, set from Stock Entry) and an optional
+HSN/SAC code, both frozen onto every invoice/purchase line at the time of sale so a
+later edit to the product doesn't rewrite an old document. Invoices split each item's
+GST evenly into CGST + SGST on the printed invoice — the standard format for an
 intra-state Indian sale. If this business ever bills across states, that half should
 become IGST instead — not handled here.
 

@@ -6,6 +6,7 @@ type InvoiceStatus = "active" | "voided";
 
 type ExportRow = {
   id: number;
+  invoiceNo?: string;
   customerName: string;
   customerAddress: string;
   itemsLabel: string;
@@ -18,7 +19,9 @@ type ExportRow = {
   createdAt: string;
 };
 
-function invoiceNumberFor(id: number) {
+// Legacy fallback only — every invoice placed since the invoice_no
+// migration already carries a real one, sent through from the client.
+function legacyInvoiceNo(id: number) {
   return `INV-${String(id).padStart(6, "0")}`;
 }
 
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
     for (const inv of invoices) {
       const voided = inv.status === "voided";
       sheet.addRow({
-        invoiceNo: invoiceNumberFor(inv.id),
+        invoiceNo: inv.invoiceNo || legacyInvoiceNo(inv.id),
         date: new Date(inv.createdAt).toLocaleDateString("en-IN", {
           year: "numeric",
           month: "short",

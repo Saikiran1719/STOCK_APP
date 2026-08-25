@@ -11,6 +11,7 @@ type Settings = {
   currencySymbol: string;
   invoiceNote: string;
   logoDataUrl: string;
+  invoicePrefix: string;
 };
 
 const EMPTY: Settings = {
@@ -22,7 +23,14 @@ const EMPTY: Settings = {
   currencySymbol: "",
   invoiceNote: "",
   logoDataUrl: "",
+  invoicePrefix: "INV",
 };
+
+function currentFyLabel() {
+  const now = new Date();
+  const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1; // April = month 3
+  return `${String(fyStart % 100).padStart(2, "0")}-${String((fyStart + 1) % 100).padStart(2, "0")}`;
+}
 
 const MAX_LOGO_FILE_BYTES = 500 * 1024; // 500KB
 
@@ -219,6 +227,19 @@ export default function SettingsPage() {
               value={settings.invoiceNote}
               onChange={(e) => update("invoiceNote", e.target.value)}
               className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+            />
+          </Field>
+
+          <Field
+            label="Invoice number prefix"
+            hint={`New invoices this financial year look like ${settings.invoicePrefix || "INV"}/${currentFyLabel()}/00001, numbered consecutively — only affects new invoices, existing ones never renumber`}
+          >
+            <input
+              type="text"
+              value={settings.invoicePrefix}
+              onChange={(e) => update("invoicePrefix", e.target.value)}
+              placeholder="INV"
+              className="w-full max-w-xs rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
           </Field>
 

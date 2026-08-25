@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { name?: string; cost?: number; stock?: number; gstRate?: number };
+  let body: { name?: string; cost?: number; stock?: number; gstRate?: number; hsnCode?: string };
   try {
     body = await request.json();
   } catch {
@@ -27,9 +27,10 @@ export async function POST(request: NextRequest) {
   const cost = Number(body.cost);
   const stock = Number(body.stock);
   const gstRate = Number(body.gstRate);
+  const hsnCode = typeof body.hsnCode === "string" ? body.hsnCode : "";
 
   try {
-    const result = await createProduct(name, cost, stock, gstRate);
+    const result = await createProduct(name, cost, stock, gstRate, hsnCode);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  let body: { name?: string; cost?: number; gstRate?: number };
+  let body: { name?: string; cost?: number; gstRate?: number; hsnCode?: string };
   try {
     body = await request.json();
   } catch {
@@ -51,9 +52,10 @@ export async function PATCH(request: NextRequest) {
   const name = typeof body.name === "string" ? body.name : "";
   const cost = Number(body.cost);
   const gstRate = Number(body.gstRate);
+  const hsnCode = typeof body.hsnCode === "string" ? body.hsnCode : "";
 
   try {
-    const result = await updateProduct(name, cost, gstRate);
+    const result = await updateProduct(name, cost, gstRate, hsnCode);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

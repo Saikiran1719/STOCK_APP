@@ -745,3 +745,278 @@ begin
   return query select v_payment_id, v_new_paid, v_purchase.total - v_new_paid;
 end;
 $$;
+
+-- --------------------------------------------------------------------------
+-- GST compliance depth: the full 0/5/12/18/28% rate slabs (was hard-limited
+-- to 5%/18%, which was never a real GST rule — just what the two seed
+-- products happened to use), HSN/SAC codes on products (frozen onto each
+-- invoice/purchase line the same way unit_cost and gst_rate already are, so
+-- a later HSN edit on the product doesn't rewrite an old document), and a
+-- proper financial-year invoice numbering series instead of the raw
+-- database id — GST rule 46 expects consecutive, unique-per-FY invoice
+-- numbers, not "whatever the primary key happened to be."
+--
+-- No CHECK constraint ever restricted products.gst_rate to 5/18 — that
+-- limit was purely in the app's own validation (GST_RATES in db.ts), so
+-- widening it to the full slab set needs no migration here.
+-- --------------------------------------------------------------------------
+
+alter table products add column if not exists hsn_code text not null default '';
+alter table invoice_items add column if not exists hsn_code text not null default '';
+alter table purchase_items add column if not exists hsn_code text not null default '';
+
+-- Prefix is configurable from Settings (default "INV") so a business can
+-- match whatever series they already use elsewhere.
+alter table company_settings add column if not exists invoice_prefix text not null default 'INV';
+
+-- Nullable: invoices placed before this migration keep invoice_no = null;
+-- the app falls back to the old INV-000123 format for those specifically,
+-- so old printed/exported invoices don't appear to change number after the
+-- fact. Every new invoice always gets one. Partial unique index (not a
+-- plain unique column) for exactly that reason — many nulls can coexist.
+alter table invoices add column if not exists invoice_no text;
+create unique index if not exists invoices_invoice_no_idx on invoices(invoice_no) where invoice_no is not null;
+
+-- One row per financial year, holding the next number to hand out. The
+-- atomic "upsert, then read back what was just written" below (rather than
+-- a plain select-max-then-insert) is what makes numbering safe under
+-- concurrent invoice creation — two simultaneous place_invoice() calls in
+-- the same FY can't both walk away with the same number, because the
+-- UPDATE branch takes a row lock the second call has to wait behind.
+create table if not exists invoice_number_counters (
+  fy_label text primary key,
+  next_number integer not null default 1
+);
+
+-- place_invoice keeps its existing 5-argument signature — nothing here
+-- adds a parameter, so this is a plain CREATE OR REPLACE, no DROP needed.
+-- Two things change inside: each line item now carries the product's
+-- hsn_code, and the invoice gets a real invoice_no assigned at insert time
+-- (financial year = Apr-Mar, so "25-26" covers Apr 2025 through Mar 2026 —
+-- computed from now(), which runs in the database's own timezone; a
+-- business that cares about the exact IST midnight boundary on Apr 1
+-- specifically should be aware of that, same as every other now()-derived
+-- timestamp already in this file).
+create or replace function place_invoice(
+  p_customer_name text,
+  p_customer_address text,
+  p_items jsonb,
+  p_party_id bigint default null,
+  p_discount_percent numeric default 0
+)
+returns table (invoice_id bigint, invoice_total numeric)
+language plpgsql
+as $$
+declare
+  v_invoice_id bigint;
+  v_party_id bigint;
+  v_discount_percent numeric;
+  v_fy_label text;
+  v_prefix text;
+  v_seq integer;
+  v_invoice_no text;
+  v_item jsonb;
+  v_name text;
+  v_qty integer;
+  v_product products%rowtype;
+  v_gross_line numeric;
+  v_item_subtotal numeric;
+  v_item_gst numeric;
+  v_item_total numeric;
+  v_invoice_gross numeric := 0;
+  v_invoice_subtotal numeric := 0;
+  v_invoice_gst numeric := 0;
+  v_invoice_total numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'no_items';
+  end if;
+
+  if p_customer_name is null or btrim(p_customer_name) = '' then
+    raise exception 'customer_name_required';
+  end if;
+
+  if p_customer_address is null or btrim(p_customer_address) = '' then
+    raise exception 'customer_address_required';
+  end if;
+
+  v_discount_percent := greatest(0, least(100, coalesce(p_discount_percent, 0)));
+
+  if p_party_id is not null then
+    v_party_id := p_party_id;
+  else
+    select id into v_party_id from parties
+      where type = 'customer' and lower(name) = lower(btrim(p_customer_name))
+      limit 1;
+    if not found then
+      insert into parties (type, name, address)
+      values ('customer', btrim(p_customer_name), btrim(p_customer_address))
+      returning id into v_party_id;
+    end if;
+  end if;
+
+  if extract(month from now()) >= 4 then
+    v_fy_label := to_char(now(), 'YY') || '-' || to_char(now() + interval '1 year', 'YY');
+  else
+    v_fy_label := to_char(now() - interval '1 year', 'YY') || '-' || to_char(now(), 'YY');
+  end if;
+
+  select coalesce(nullif(invoice_prefix, ''), 'INV') into v_prefix from company_settings where id = 1;
+  v_prefix := coalesce(v_prefix, 'INV');
+
+  insert into invoice_number_counters (fy_label, next_number)
+  values (v_fy_label, 2)
+  on conflict (fy_label) do update set next_number = invoice_number_counters.next_number + 1
+  returning next_number - 1 into v_seq;
+
+  v_invoice_no := v_prefix || '/' || v_fy_label || '/' || lpad(v_seq::text, 5, '0');
+
+  insert into invoices
+    (customer_name, customer_address, party_id, subtotal, gst_amount, total, discount_percent, discount_amount, invoice_no)
+  values
+    (p_customer_name, p_customer_address, v_party_id, 0, 0, 0, v_discount_percent, 0, v_invoice_no)
+  returning id into v_invoice_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_name := v_item->>'name';
+    v_qty := (v_item->>'qty')::integer;
+
+    if v_name is null or v_qty is null or v_qty <= 0 then
+      raise exception 'invalid_item:%', coalesce(v_name, '?');
+    end if;
+
+    select * into v_product from products where products.name = v_name for update;
+
+    if not found then
+      raise exception 'not_found:%', v_name;
+    end if;
+
+    if v_product.stock < v_qty then
+      raise exception 'insufficient_stock:%:%', v_name, v_product.stock;
+    end if;
+
+    update products set stock = products.stock - v_qty where id = v_product.id;
+
+    v_gross_line := v_product.cost * v_qty;
+    v_item_subtotal := v_gross_line * (1 - v_discount_percent / 100);
+    v_item_gst := v_item_subtotal * v_product.gst_rate / 100;
+    v_item_total := v_item_subtotal + v_item_gst;
+
+    insert into invoice_items
+      (invoice_id, product_id, product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, new_stock, hsn_code)
+    values
+      (v_invoice_id, v_product.id, v_product.name, v_qty, v_product.cost, v_product.gst_rate,
+       v_item_subtotal, v_item_gst, v_item_total, v_product.stock - v_qty, v_product.hsn_code);
+
+    v_invoice_gross := v_invoice_gross + v_gross_line;
+    v_invoice_subtotal := v_invoice_subtotal + v_item_subtotal;
+    v_invoice_gst := v_invoice_gst + v_item_gst;
+    v_invoice_total := v_invoice_total + v_item_total;
+  end loop;
+
+  update invoices
+  set subtotal = v_invoice_subtotal,
+      gst_amount = v_invoice_gst,
+      total = v_invoice_total,
+      discount_amount = v_invoice_gross - v_invoice_subtotal
+  where id = v_invoice_id;
+
+  return query select v_invoice_id, v_invoice_total;
+end;
+$$;
+
+-- record_purchase also keeps its existing signature — just freezes
+-- hsn_code onto each purchase line now, same as place_invoice above.
+create or replace function record_purchase(
+  p_vendor_name text,
+  p_vendor_ref text,
+  p_items jsonb,
+  p_party_id bigint default null
+)
+returns table (purchase_id bigint, purchase_total numeric)
+language plpgsql
+as $$
+declare
+  v_purchase_id bigint;
+  v_party_id bigint;
+  v_item jsonb;
+  v_name text;
+  v_qty integer;
+  v_unit_cost numeric;
+  v_product products%rowtype;
+  v_item_subtotal numeric;
+  v_item_gst numeric;
+  v_item_total numeric;
+  v_purchase_subtotal numeric := 0;
+  v_purchase_gst numeric := 0;
+  v_purchase_total numeric := 0;
+begin
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'no_items';
+  end if;
+
+  if p_vendor_name is null or btrim(p_vendor_name) = '' then
+    raise exception 'vendor_name_required';
+  end if;
+
+  if p_party_id is not null then
+    v_party_id := p_party_id;
+  else
+    select id into v_party_id from parties
+      where type = 'vendor' and lower(name) = lower(btrim(p_vendor_name))
+      limit 1;
+    if not found then
+      insert into parties (type, name)
+      values ('vendor', btrim(p_vendor_name))
+      returning id into v_party_id;
+    end if;
+  end if;
+
+  insert into purchases (party_id, vendor_name, vendor_ref, subtotal, gst_amount, total)
+  values (v_party_id, btrim(p_vendor_name), coalesce(btrim(p_vendor_ref), ''), 0, 0, 0)
+  returning id into v_purchase_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_name := v_item->>'name';
+    v_qty := (v_item->>'qty')::integer;
+    v_unit_cost := (v_item->>'unitCost')::numeric;
+
+    if v_name is null or v_qty is null or v_qty <= 0 then
+      raise exception 'invalid_item:%', coalesce(v_name, '?');
+    end if;
+    if v_unit_cost is null or v_unit_cost < 0 then
+      raise exception 'invalid_cost:%', v_name;
+    end if;
+
+    select * into v_product from products where products.name = v_name for update;
+
+    if not found then
+      raise exception 'not_found:%', v_name;
+    end if;
+
+    update products set stock = products.stock + v_qty where id = v_product.id;
+
+    v_item_subtotal := v_unit_cost * v_qty;
+    v_item_gst := v_item_subtotal * v_product.gst_rate / 100;
+    v_item_total := v_item_subtotal + v_item_gst;
+
+    insert into purchase_items
+      (purchase_id, product_id, product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total, new_stock, hsn_code)
+    values
+      (v_purchase_id, v_product.id, v_product.name, v_qty, v_unit_cost, v_product.gst_rate,
+       v_item_subtotal, v_item_gst, v_item_total, v_product.stock + v_qty, v_product.hsn_code);
+
+    v_purchase_subtotal := v_purchase_subtotal + v_item_subtotal;
+    v_purchase_gst := v_purchase_gst + v_item_gst;
+    v_purchase_total := v_purchase_total + v_item_total;
+  end loop;
+
+  update purchases
+  set subtotal = v_purchase_subtotal, gst_amount = v_purchase_gst, total = v_purchase_total
+  where id = v_purchase_id;
+
+  return query select v_purchase_id, v_purchase_total;
+end;
+$$;

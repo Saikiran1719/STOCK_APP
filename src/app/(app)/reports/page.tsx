@@ -9,6 +9,22 @@ type GstRateBreakdown = {
   total: number;
 };
 
+type HsnBreakdown = {
+  hsnCode: string;
+  gstRate: number;
+  qty: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+};
+
+type SupplyCategoryTotals = {
+  invoiceCount: number;
+  subtotal: number;
+  gstAmount: number;
+  total: number;
+};
+
 type ReportSummary = {
   invoiceCount: number;
   subtotal: number;
@@ -17,6 +33,9 @@ type ReportSummary = {
   amountPaid: number;
   amountOutstanding: number;
   byGstRate: GstRateBreakdown[];
+  byHsn: HsnBreakdown[];
+  b2b: SupplyCategoryTotals;
+  b2c: SupplyCategoryTotals;
 };
 
 function currentMonthValue() {
@@ -112,7 +131,20 @@ export default function ReportsPage() {
             />
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <div className="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-sm font-semibold text-ink">🏢 B2B vs B2C</h2>
+              <p className="text-xs text-muted">
+                Split by whether the billed party has a GSTIN on file — GSTR-1 Tables 4 (B2B) and 7 (B2C).
+              </p>
+            </div>
+            <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+              <SupplyCategoryRow label="B2B (has GSTIN)" data={summary.b2b} money={money} />
+              <SupplyCategoryRow label="B2C (no GSTIN)" data={summary.b2c} money={money} />
+            </div>
+          </div>
+
+          <div className="mb-6 overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
             <div className="border-b border-border px-5 py-4">
               <h2 className="text-sm font-semibold text-ink">🧮 GST breakdown by rate</h2>
               <p className="text-xs text-muted">Useful for filing returns per slab.</p>
@@ -152,10 +184,74 @@ export default function ReportsPage() {
               </div>
             )}
           </div>
+
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+            <div className="border-b border-border px-5 py-4">
+              <h2 className="text-sm font-semibold text-ink">🏷️ HSN/SAC summary</h2>
+              <p className="text-xs text-muted">GSTR-1 Table 12 — every HSN code billed this period, by rate.</p>
+            </div>
+            {summary.byHsn.length === 0 ? (
+              <p className="px-5 py-8 text-center text-sm text-muted">No sales this period.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                      <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">HSN/SAC</th>
+                      <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Rate</th>
+                      <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Qty</th>
+                      <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Taxable value</th>
+                      <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">GST amount</th>
+                      <th className="whitespace-nowrap border-b border-border px-5 py-3">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.byHsn.map((row, i) => (
+                      <tr key={`${row.hsnCode}-${row.gstRate}`} className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft`}>
+                        <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 font-medium text-ink">
+                          {row.hsnCode}
+                        </td>
+                        <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">{row.gstRate}%</td>
+                        <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">{row.qty}</td>
+                        <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">
+                          {money(row.subtotal)}
+                        </td>
+                        <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">
+                          {money(row.gstAmount)}
+                        </td>
+                        <td className="whitespace-nowrap border-b border-border px-5 py-3 text-ink">{money(row.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
           <p className="mt-3 text-xs text-muted">Voided invoices are excluded from these totals.</p>
         </>
       ) : null}
     </main>
+  );
+}
+
+function SupplyCategoryRow({
+  label,
+  data,
+  money,
+}: {
+  label: string;
+  data: SupplyCategoryTotals;
+  money: (n: number) => string;
+}) {
+  return (
+    <div className="px-5 py-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 text-xl font-bold tabular-nums text-ink">{money(data.total)}</p>
+      <p className="mt-1 text-xs text-muted">
+        {data.invoiceCount} invoice{data.invoiceCount === 1 ? "" : "s"} · taxable {money(data.subtotal)} · GST{" "}
+        {money(data.gstAmount)}
+      </p>
+    </div>
   );
 }
 
