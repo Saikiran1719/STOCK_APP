@@ -60,6 +60,8 @@ export type InvoiceDetail = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  discountPercent: number;
+  discountAmount: number;
   amountPaid: number;
   paymentStatus: PaymentStatus;
   status: InvoiceStatus;
@@ -337,7 +339,8 @@ function placeDemoInvoice(
   items: InvoiceItemInput[],
   customerName: string,
   customerAddress: string,
-  partyId?: number
+  partyId?: number,
+  discountPercent = 0
 ): PlaceInvoiceResult {
   if (items.length === 0) {
     return { ok: false, error: "Add at least one item." };
@@ -348,6 +351,8 @@ function placeDemoInvoice(
   if (!customerAddress.trim()) {
     return { ok: false, error: "Customer address is required." };
   }
+
+  const cleanDiscountPercent = Math.max(0, Math.min(100, Number(discountPercent) || 0));
 
   // Validate everything first (all-or-nothing), tracking a running stock
   // balance per product so duplicate lines for the same product are
@@ -376,13 +381,15 @@ function placeDemoInvoice(
   }
 
   const invoiceItems: InvoiceItem[] = [];
+  let grossSubtotal = 0;
   let subtotal = 0;
   let gstAmount = 0;
   let total = 0;
 
   for (const { product, qty } of lines) {
     product.stock -= qty;
-    const lineSubtotal = product.cost * qty;
+    const grossLine = product.cost * qty;
+    const lineSubtotal = grossLine * (1 - cleanDiscountPercent / 100);
     const lineGst = (lineSubtotal * product.gstRate) / 100;
     const lineTotal = lineSubtotal + lineGst;
     invoiceItems.push({
@@ -394,6 +401,7 @@ function placeDemoInvoice(
       gstAmount: lineGst,
       total: lineTotal,
     });
+    grossSubtotal += grossLine;
     subtotal += lineSubtotal;
     gstAmount += lineGst;
     total += lineTotal;
@@ -411,6 +419,8 @@ function placeDemoInvoice(
     subtotal,
     gstAmount,
     total,
+    discountPercent: cleanDiscountPercent,
+    discountAmount: grossSubtotal - subtotal,
     amountPaid: 0,
     paymentStatus: "unpaid",
     status: "active",
@@ -933,7 +943,8 @@ export async function placeInvoice(
   items: InvoiceItemInput[],
   customerName: string,
   customerAddress: string,
-  partyId?: number
+  partyId?: number,
+  discountPercent = 0
 ): Promise<PlaceInvoiceResult> {
   const cleanItems = items
     .map((it) => ({ name: (it.name ?? "").trim(), qty: Number(it.qty) }))
@@ -957,8 +968,10 @@ export async function placeInvoice(
     return { ok: false, error: "Customer address is required." };
   }
 
+  const cleanDiscountPercent = Math.max(0, Math.min(100, Number(discountPercent) || 0));
+
   if (isDemoMode()) {
-    return placeDemoInvoice(cleanItems, cleanCustomerName, cleanCustomerAddress, partyId);
+    return placeDemoInvoice(cleanItems, cleanCustomerName, cleanCustomerAddress, partyId, cleanDiscountPercent);
   }
 
   const { data, error } = await getClient().rpc("place_invoice", {
@@ -966,6 +979,7 @@ export async function placeInvoice(
     p_customer_address: cleanCustomerAddress,
     p_items: cleanItems,
     p_party_id: partyId ?? null,
+    p_discount_percent: cleanDiscountPercent,
   });
 
   if (error) {
@@ -1038,7 +1052,7 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
   const { data, error } = await getClient()
     .from("invoices")
     .select(
-      "id, party_id, customer_name, customer_address, subtotal, gst_amount, total, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
+      "id, party_id, customer_name, customer_address, subtotal, gst_amount, total, discount_percent, discount_amount, amount_paid, status, void_reason, created_at, invoice_items(product_name, qty, unit_cost, gst_rate, subtotal, gst_amount, total)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -1067,6 +1081,8 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
     subtotal: Number(data.subtotal),
     gstAmount: Number(data.gst_amount),
     total,
+    discountPercent: Number(data.discount_percent ?? 0),
+    discountAmount: Number(data.discount_amount ?? 0),
     amountPaid,
     paymentStatus: derivePaymentStatus(total, amountPaid),
     status: (data.status ?? "active") as InvoiceStatus,

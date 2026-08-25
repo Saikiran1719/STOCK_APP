@@ -310,12 +310,19 @@ create index if not exists parties_name_idx on parties (lower(name));
 alter table invoices add column if not exists party_id bigint references parties(id);
 create index if not exists invoices_party_id_idx on invoices(party_id);
 
--- place_invoice gains a 4th, optional parameter — CREATE OR REPLACE can't
+-- Invoice-level discount, applied before GST (the correct order under GST
+-- rules: tax is charged on the net/discounted value, not the gross one).
+-- discount_amount is derived and stored alongside the percent so a printed
+-- invoice can show "Gross / Discount / Taxable" without recomputing it.
+alter table invoices add column if not exists discount_percent numeric not null default 0;
+alter table invoices add column if not exists discount_amount numeric not null default 0;
+
+-- place_invoice gains a 5th, optional parameter — CREATE OR REPLACE can't
 -- add a parameter to an existing function (Postgres would just create a
--- second, ambiguous overload), so the old 3-argument version has to be
--- dropped explicitly first, same as the earlier 2-argument cleanup above.
--- A no-op once it's already gone.
-drop function if exists place_invoice(text, text, jsonb);
+-- second, ambiguous overload), so the old 4-argument version has to be
+-- dropped explicitly first, same as the earlier cleanups above. A no-op
+-- once it's already gone.
+drop function if exists place_invoice(text, text, jsonb, bigint);
 
 -- Pass p_party_id to bill an existing party directly (picked from the
 -- Dashboard's customer field); omit it and the function resolves one itself
@@ -323,11 +330,19 @@ drop function if exists place_invoice(text, text, jsonb);
 -- name + address given if nothing matches. Either way the invoice keeps its
 -- own customer_name/customer_address snapshot — it never changes later even
 -- if the party's saved details do.
+--
+-- p_discount_percent (0-100, clamped) is applied uniformly to every line's
+-- gross amount before that line's own GST is computed — so a mix of 5% and
+-- 18% items on the same invoice still gets taxed correctly per item, just
+-- on a discounted base. unit_cost stored on each line stays the original,
+-- undiscounted rate (what's printed as "Rate"); subtotal is the discounted
+-- taxable value GST is actually computed on.
 create or replace function place_invoice(
   p_customer_name text,
   p_customer_address text,
   p_items jsonb,
-  p_party_id bigint default null
+  p_party_id bigint default null,
+  p_discount_percent numeric default 0
 )
 returns table (invoice_id bigint, invoice_total numeric)
 language plpgsql
@@ -335,13 +350,16 @@ as $$
 declare
   v_invoice_id bigint;
   v_party_id bigint;
+  v_discount_percent numeric;
   v_item jsonb;
   v_name text;
   v_qty integer;
   v_product products%rowtype;
+  v_gross_line numeric;
   v_item_subtotal numeric;
   v_item_gst numeric;
   v_item_total numeric;
+  v_invoice_gross numeric := 0;
   v_invoice_subtotal numeric := 0;
   v_invoice_gst numeric := 0;
   v_invoice_total numeric := 0;
@@ -358,6 +376,8 @@ begin
     raise exception 'customer_address_required';
   end if;
 
+  v_discount_percent := greatest(0, least(100, coalesce(p_discount_percent, 0)));
+
   if p_party_id is not null then
     v_party_id := p_party_id;
   else
@@ -371,8 +391,10 @@ begin
     end if;
   end if;
 
-  insert into invoices (customer_name, customer_address, party_id, subtotal, gst_amount, total)
-  values (p_customer_name, p_customer_address, v_party_id, 0, 0, 0)
+  insert into invoices
+    (customer_name, customer_address, party_id, subtotal, gst_amount, total, discount_percent, discount_amount)
+  values
+    (p_customer_name, p_customer_address, v_party_id, 0, 0, 0, v_discount_percent, 0)
   returning id into v_invoice_id;
 
   for v_item in select * from jsonb_array_elements(p_items)
@@ -396,7 +418,8 @@ begin
 
     update products set stock = products.stock - v_qty where id = v_product.id;
 
-    v_item_subtotal := v_product.cost * v_qty;
+    v_gross_line := v_product.cost * v_qty;
+    v_item_subtotal := v_gross_line * (1 - v_discount_percent / 100);
     v_item_gst := v_item_subtotal * v_product.gst_rate / 100;
     v_item_total := v_item_subtotal + v_item_gst;
 
@@ -406,13 +429,17 @@ begin
       (v_invoice_id, v_product.id, v_product.name, v_qty, v_product.cost, v_product.gst_rate,
        v_item_subtotal, v_item_gst, v_item_total, v_product.stock - v_qty);
 
+    v_invoice_gross := v_invoice_gross + v_gross_line;
     v_invoice_subtotal := v_invoice_subtotal + v_item_subtotal;
     v_invoice_gst := v_invoice_gst + v_item_gst;
     v_invoice_total := v_invoice_total + v_item_total;
   end loop;
 
   update invoices
-  set subtotal = v_invoice_subtotal, gst_amount = v_invoice_gst, total = v_invoice_total
+  set subtotal = v_invoice_subtotal,
+      gst_amount = v_invoice_gst,
+      total = v_invoice_total,
+      discount_amount = v_invoice_gross - v_invoice_subtotal
   where id = v_invoice_id;
 
   return query select v_invoice_id, v_invoice_total;

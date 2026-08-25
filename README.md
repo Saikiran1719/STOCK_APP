@@ -1,11 +1,12 @@
 # CounterBook
 
-A billing and stock console: place multi-item sales (reduces stock, generates a
-printable GST invoice), record vendor purchases (stocks in with a real cost and vendor on
-record), track payment and void mistaken invoices/purchases, browse/reprint every invoice
-ever placed, run monthly GST/sales reports, manage stock/products/GST rates, and keep a
-reusable party master — customers and vendors alike — with a running ledger per party —
-all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
+A billing and stock console: build a sale on an invoice-style entry grid (pick items,
+qty, an optional discount — price and GST fill in automatically) and create a printable
+GST invoice that reduces stock, record vendor purchases (stocks in with a real cost and
+vendor on record), track payment and void mistaken invoices/purchases, browse/reprint
+every invoice ever placed, run monthly GST/sales reports, manage stock/products/GST
+rates, and keep a reusable party master — customers and vendors alike — with a running
+ledger per party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
 
 ## Look and feel
 
@@ -47,8 +48,12 @@ all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
     check, stock decrement, and line row, plus the invoice header — as **one
     transaction**. If any item can't be fulfilled, the exception rolls back everything
     that call did, so an invoice can never partially succeed (e.g. item 1 decremented
-    but item 3 out of stock). `getInvoices()` / `getInvoiceById()` read invoices back
-    for the list and reprint screens.
+    but item 3 out of stock). Takes an optional `discountPercent` (0-100, clamped) —
+    applied to every line's gross amount *before* that line's own GST is computed (the
+    order GST rules require), so a mix of 5%/18% items on one invoice still taxes each
+    item correctly on its own discounted base. `unit_cost` stored per line stays the
+    original rate; `subtotal` is the discounted taxable value. `getInvoices()` /
+    `getInvoiceById()` read invoices back for the list and reprint screens.
   - `updateInvoicePayment()` records `amount_paid` on an invoice; payment status
     (unpaid/partial/paid) is always derived from `amount_paid` vs `total`, never stored
     separately, so the two can't drift out of sync.
@@ -89,7 +94,7 @@ all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
 - `src/app/api/*` — route handlers: `login`, `logout`, `products` (GET list + POST
   create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
   remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice — accepts
-  an optional `partyId`), `invoices` (GET list), `invoices/[id]` (GET one + PATCH
+  an optional `partyId` and `discountPercent`), `invoices` (GET list), `invoices/[id]` (GET one + PATCH
   payment, for the reprint page), `invoices/[id]/void` (POST), `invoices/export` (POST,
   builds and streams back an `.xlsx` file), `purchases` (GET list + POST record — accepts
   an optional `partyId`), `purchases/[id]` (GET one + PATCH payment), `purchases/[id]/void`
@@ -101,12 +106,18 @@ all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
 - `src/app/(app)/` — the app shell: `layout.tsx` renders the sidebar
   (`src/components/Sidebar.tsx`); routes inside it, in nav order:
   - `page.tsx` — **Dashboard**: KPI tiles (products, units in stock, low stock,
-    inventory value) and the "New sale" cart builder (add products to a cart,
-    required customer name + address, one invoice on submit). The customer name field
-    is backed by a `<datalist>` of saved parties — typing an exact match auto-fills
-    their address and bills that party directly; typing a new name still works, and a
-    party is created from it automatically on submit. No stock table here — that lives
-    on its own tab so the order-entry screen stays focused.
+    inventory value) plus a "Start a new sale" call-to-action into its own tab. No stock
+    table and no billing form here — both live on their own tabs so this screen stays a
+    pure at-a-glance overview.
+  - `sale/page.tsx` — **New Sale**: an editable, invoice-shaped entry grid (same
+    black-ruled table styling as the printed invoice) — add rows, pick a product per
+    row, and its Rate and GST% fill in automatically; qty is clamped to remaining stock
+    (accounting for every other row using the same product). "Bill To" (customer name,
+    backed by a `<datalist>` of saved parties — an exact match auto-fills their address
+    and bills that party directly; a new name still works, and a party is created from
+    it automatically on submit) sits top-left, with a Discount % field beside the
+    address. Totals mirror the printed invoice — Gross/Discount rows only appear when a
+    discount was actually entered — and submitting goes straight to the new invoice.
   - `parties/page.tsx` — **Parties**: a Customers/Vendors toggle over the same list —
     every saved party of that type, searchable, with a transaction count/total
     billed-or-purchased/outstanding-or-payable, and a form to add one manually.

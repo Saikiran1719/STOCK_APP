@@ -26,6 +26,8 @@ type Invoice = {
   subtotal: number;
   gstAmount: number;
   total: number;
+  discountPercent: number;
+  discountAmount: number;
   amountPaid: number;
   paymentStatus: PaymentStatus;
   status: InvoiceStatus;
@@ -305,6 +307,15 @@ export default function InvoicePage() {
         <div className="flex justify-end border-t-2 border-ink p-4 sm:p-6">
           <table className="w-full max-w-xs text-sm">
             <tbody>
+              {invoice.discountAmount > 0 && (
+                <>
+                  <TotalRow label="Gross Amount" value={money(invoice.subtotal + invoice.discountAmount)} />
+                  <TotalRow
+                    label={`Discount (${invoice.discountPercent}%)`}
+                    value={`− ${money(invoice.discountAmount)}`}
+                  />
+                </>
+              )}
               <TotalRow label="Taxable Amount" value={money(invoice.subtotal)} />
               <TotalRow label="CGST" value={money(totalCgst)} />
               <TotalRow label="SGST" value={money(totalSgst)} />
