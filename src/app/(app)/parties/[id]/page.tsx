@@ -39,6 +39,27 @@ type Purchase = {
   createdAt: string;
 };
 
+type PayMode = "cash" | "bank" | "upi" | "cheque" | "other";
+
+const PAY_MODE_LABELS: Record<PayMode, string> = {
+  cash: "Cash",
+  bank: "Bank transfer",
+  upi: "UPI",
+  cheque: "Cheque",
+  other: "Other",
+};
+
+type PaymentEntry = {
+  id: number;
+  direction: "in" | "out";
+  invoiceId: number | null;
+  purchaseId: number | null;
+  amount: number;
+  mode: PayMode;
+  reference: string;
+  createdAt: string;
+};
+
 type Message = { type: "ok" | "error"; text: string };
 
 function invoiceNumberFor(id: number) {
@@ -54,6 +75,7 @@ export default function PartyDetailPage() {
   const [party, setParty] = useState<Party | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [payments, setPayments] = useState<PaymentEntry[]>([]);
   const [currency, setCurrency] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -87,6 +109,7 @@ export default function PartyDetailPage() {
       setParty(data.party);
       setInvoices(data.invoices || []);
       setPurchases(data.purchases || []);
+      setPayments(data.payments || []);
       setName(data.party.name);
       setAddress(data.party.address);
       setPhone(data.party.phone);
@@ -399,6 +422,59 @@ export default function PartyDetailPage() {
           </div>
         )}
       </div>
+
+      {payments.length > 0 && (
+        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-sm font-semibold text-ink">💳 Payment history</h2>
+            <p className="text-xs text-muted">
+              {isVendor ? "Every payment made to this vendor." : "Every payment collected from this party."}
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                  <Th>Date</Th>
+                  <Th>Against</Th>
+                  <Th>Mode</Th>
+                  <Th>Reference</Th>
+                  <Th align="right">Amount</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p, i) => (
+                  <tr key={p.id} className={i % 2 === 1 ? "bg-stripe" : ""}>
+                    <Td className="text-muted">
+                      {new Date(p.createdAt).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </Td>
+                    <Td>
+                      {p.direction === "in" ? (
+                        <Link href={`/invoices/${p.invoiceId}`} className="text-accent hover:underline">
+                          Invoice #{p.invoiceId}
+                        </Link>
+                      ) : (
+                        <Link href={`/purchases/${p.purchaseId}`} className="text-accent hover:underline">
+                          Purchase #{p.purchaseId}
+                        </Link>
+                      )}
+                    </Td>
+                    <Td className="text-muted">{PAY_MODE_LABELS[p.mode]}</Td>
+                    <Td className="text-muted">{p.reference || "—"}</Td>
+                    <Td align="right" className="font-medium text-ink">
+                      {money(p.amount)}
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

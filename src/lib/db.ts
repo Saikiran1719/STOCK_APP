@@ -185,8 +185,33 @@ export type ProductResult = { ok: true; product: Product } | { ok: false; error:
 
 export type SimpleResult = { ok: true } | { ok: false; error: string };
 
-export type PaymentUpdateResult =
-  | { ok: true; amountPaid: number; paymentStatus: PaymentStatus }
+/** How a payment moved — the same five modes for money coming in and going out. */
+export type PaymentMode = "cash" | "bank" | "upi" | "cheque" | "other";
+
+export const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "bank", label: "Bank transfer" },
+  { value: "upi", label: "UPI" },
+  { value: "cheque", label: "Cheque" },
+  { value: "other", label: "Other" },
+];
+
+/** One row of the payments ledger — a single amount collected from a customer ('in') or paid to a vendor ('out'). */
+export type PaymentRecord = {
+  id: number;
+  direction: "in" | "out";
+  partyId: number | null;
+  partyName: string;
+  invoiceId: number | null;
+  purchaseId: number | null;
+  amount: number;
+  mode: PaymentMode;
+  reference: string;
+  createdAt: string;
+};
+
+export type PaymentRecordResult =
+  | { ok: true; paymentId: number; amountPaid: number; balanceDue: number; paymentStatus: PaymentStatus }
   | { ok: false; error: string };
 
 function derivePaymentStatus(total: number, amountPaid: number): PaymentStatus {
@@ -235,11 +260,16 @@ let demoInvoices: InvoiceDetail[] = [];
 let demoPurchases: PurchaseDetail[] = [];
 let demoStockAdjustments: StockAdjustmentRecord[] = [];
 let demoParties: Party[] = [];
+let demoPayments: PaymentRecord[] = [];
 let demoNextProductId = 4;
 let demoNextInvoiceId = 1;
 let demoNextPurchaseId = 1;
 let demoNextAdjustmentId = 1;
 let demoNextPartyId = 1;
+let demoNextPaymentId = 1;
+
+/** Shared by getPayments()'s real and demo paths — narrows the ledger to one party/invoice/purchase, or leaves it as the whole history. */
+export type PaymentFilter = { partyId?: number; invoiceId?: number; purchaseId?: number };
 let demoSettings: Settings = { ...DEFAULT_SETTINGS };
 
 function getDemoProducts(): Product[] {
@@ -326,13 +356,14 @@ function getDemoPartyById(id: number): Party | null {
 
 function getDemoPartyLedger(
   id: number
-): { party: Party; invoices: InvoiceSummary[]; purchases: PurchaseSummary[] } | null {
+): { party: Party; invoices: InvoiceSummary[]; purchases: PurchaseSummary[]; payments: PaymentRecord[] } | null {
   const party = getDemoPartyById(id);
   if (!party) return null;
+  const payments = getDemoPayments({ partyId: id });
   if (party.type === "vendor") {
-    return { party, invoices: [], purchases: getDemoPurchases().filter((pu) => pu.partyId === id) };
+    return { party, invoices: [], purchases: getDemoPurchases().filter((pu) => pu.partyId === id), payments };
   }
-  return { party, invoices: getDemoInvoices().filter((inv) => inv.partyId === id), purchases: [] };
+  return { party, invoices: getDemoInvoices().filter((inv) => inv.partyId === id), purchases: [], payments };
 }
 
 function placeDemoInvoice(
@@ -458,16 +489,47 @@ function getDemoInvoiceById(id: number): InvoiceDetail | null {
   return invoice ? { ...invoice, items: invoice.items.map((it) => ({ ...it })) } : null;
 }
 
-function updateDemoInvoicePayment(id: number, amountPaid: number): PaymentUpdateResult {
+function recordDemoInvoicePayment(
+  id: number,
+  amount: number,
+  mode: PaymentMode,
+  reference: string
+): PaymentRecordResult {
   const invoice = demoInvoices.find((inv) => inv.id === id);
   if (!invoice) return { ok: false, error: "Invoice not found." };
   if (invoice.status === "voided") {
     return { ok: false, error: "Cannot record payment on a voided invoice." };
   }
-  const clamped = Math.max(0, Math.min(amountPaid, invoice.total));
-  invoice.amountPaid = clamped;
-  invoice.paymentStatus = derivePaymentStatus(invoice.total, clamped);
-  return { ok: true, amountPaid: clamped, paymentStatus: invoice.paymentStatus };
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Enter an amount greater than 0." };
+  }
+  const balance = invoice.total - invoice.amountPaid;
+  if (amount > balance + 1e-9) {
+    return { ok: false, error: `Amount exceeds the balance due (${balance.toFixed(2)}).` };
+  }
+
+  demoPayments.push({
+    id: demoNextPaymentId++,
+    direction: "in",
+    partyId: invoice.partyId,
+    partyName: invoice.customerName,
+    invoiceId: invoice.id,
+    purchaseId: null,
+    amount,
+    mode,
+    reference,
+    createdAt: new Date().toISOString(),
+  });
+
+  invoice.amountPaid += amount;
+  invoice.paymentStatus = derivePaymentStatus(invoice.total, invoice.amountPaid);
+  return {
+    ok: true,
+    paymentId: demoNextPaymentId - 1,
+    amountPaid: invoice.amountPaid,
+    balanceDue: invoice.total - invoice.amountPaid,
+    paymentStatus: invoice.paymentStatus,
+  };
 }
 
 function voidDemoInvoice(id: number, reason: string): SimpleResult {
@@ -586,16 +648,56 @@ function getDemoPurchaseById(id: number): PurchaseDetail | null {
   return purchase ? { ...purchase, items: purchase.items.map((it) => ({ ...it })) } : null;
 }
 
-function updateDemoPurchasePayment(id: number, amountPaid: number): PaymentUpdateResult {
+function recordDemoPurchasePayment(
+  id: number,
+  amount: number,
+  mode: PaymentMode,
+  reference: string
+): PaymentRecordResult {
   const purchase = demoPurchases.find((pu) => pu.id === id);
   if (!purchase) return { ok: false, error: "Purchase not found." };
   if (purchase.status === "voided") {
     return { ok: false, error: "Cannot record payment on a voided purchase." };
   }
-  const clamped = Math.max(0, Math.min(amountPaid, purchase.total));
-  purchase.amountPaid = clamped;
-  purchase.paymentStatus = derivePaymentStatus(purchase.total, clamped);
-  return { ok: true, amountPaid: clamped, paymentStatus: purchase.paymentStatus };
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Enter an amount greater than 0." };
+  }
+  const balance = purchase.total - purchase.amountPaid;
+  if (amount > balance + 1e-9) {
+    return { ok: false, error: `Amount exceeds the balance due (${balance.toFixed(2)}).` };
+  }
+
+  demoPayments.push({
+    id: demoNextPaymentId++,
+    direction: "out",
+    partyId: purchase.partyId,
+    partyName: purchase.vendorName,
+    invoiceId: null,
+    purchaseId: purchase.id,
+    amount,
+    mode,
+    reference,
+    createdAt: new Date().toISOString(),
+  });
+
+  purchase.amountPaid += amount;
+  purchase.paymentStatus = derivePaymentStatus(purchase.total, purchase.amountPaid);
+  return {
+    ok: true,
+    paymentId: demoNextPaymentId - 1,
+    amountPaid: purchase.amountPaid,
+    balanceDue: purchase.total - purchase.amountPaid,
+    paymentStatus: purchase.paymentStatus,
+  };
+}
+
+function getDemoPayments(filter?: PaymentFilter): PaymentRecord[] {
+  return demoPayments
+    .filter((p) => filter?.partyId == null || p.partyId === filter.partyId)
+    .filter((p) => filter?.invoiceId == null || p.invoiceId === filter.invoiceId)
+    .filter((p) => filter?.purchaseId == null || p.purchaseId === filter.purchaseId)
+    .slice()
+    .reverse();
 }
 
 function voidDemoPurchase(id: number, reason: string): SimpleResult {
@@ -760,6 +862,20 @@ function parsePurchaseError(message: string): string {
   if (message.includes("vendor_name_required")) return "Vendor name is required.";
 
   return "Failed to record the purchase. Please try again.";
+}
+
+// Postgres exception messages from record_invoice_payment / record_purchase_payment.
+function parsePaymentError(message: string): string {
+  if (message.includes("invoice_not_found")) return "Invoice not found.";
+  if (message.includes("purchase_not_found")) return "Purchase not found.";
+  if (message.includes("invoice_voided")) return "Cannot record payment on a voided invoice.";
+  if (message.includes("purchase_voided")) return "Cannot record payment on a voided purchase.";
+  if (message.includes("invalid_amount")) return "Enter an amount greater than 0.";
+
+  const exceeds = message.match(/exceeds_balance:([\d.]+)/);
+  if (exceeds) return `Amount exceeds the balance due (${Number(exceeds[1]).toFixed(2)}).`;
+
+  return "Failed to record the payment. Please try again.";
 }
 
 // --- Real Supabase backend ---
@@ -1100,39 +1216,52 @@ export async function getInvoiceById(id: number): Promise<InvoiceDetail | null> 
   };
 }
 
-/** Records a (possibly partial) payment against an invoice. */
-export async function updateInvoicePayment(
+/**
+ * Records a payment collected against an invoice — an amount to ADD to
+ * what's already been paid, with a mode and optional reference, rather
+ * than a new absolute total. Runs inside record_invoice_payment (see
+ * supabase/schema.sql), so logging the payment and updating the invoice's
+ * running amount_paid happen atomically.
+ */
+export async function recordInvoicePayment(
   id: number,
-  amountPaid: number
-): Promise<PaymentUpdateResult> {
-  if (!Number.isFinite(amountPaid) || amountPaid < 0) {
-    return { ok: false, error: "Amount paid must be 0 or more." };
+  amount: number,
+  mode: PaymentMode = "cash",
+  reference = ""
+): Promise<PaymentRecordResult> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Enter an amount greater than 0." };
   }
+  const cleanMode: PaymentMode = PAYMENT_MODES.some((m) => m.value === mode) ? mode : "cash";
+  const cleanReference = (reference ?? "").trim();
 
   if (isDemoMode()) {
-    return updateDemoInvoicePayment(id, amountPaid);
+    return recordDemoInvoicePayment(id, amount, cleanMode, cleanReference);
   }
 
-  const supabase = getClient();
-  const { data: invoiceRow, error: fetchError } = await supabase
-    .from("invoices")
-    .select("total, status")
-    .eq("id", id)
-    .maybeSingle();
+  const { data, error } = await getClient().rpc("record_invoice_payment", {
+    p_invoice_id: id,
+    p_amount: amount,
+    p_mode: cleanMode,
+    p_reference: cleanReference,
+  });
 
-  if (fetchError) throw fetchError;
-  if (!invoiceRow) return { ok: false, error: "Invoice not found." };
-  if (invoiceRow.status === "voided") {
-    return { ok: false, error: "Cannot record payment on a voided invoice." };
+  if (error) {
+    return { ok: false, error: parsePaymentError(error.message) };
   }
 
-  const total = Number(invoiceRow.total);
-  const clamped = Math.max(0, Math.min(amountPaid, total));
+  const row = (data as { payment_id: number; amount_paid: unknown; balance_due: unknown }[] | null)?.[0];
+  if (!row) return { ok: false, error: "Failed to record the payment. Please try again." };
 
-  const { error } = await supabase.from("invoices").update({ amount_paid: clamped }).eq("id", id);
-  if (error) throw error;
-
-  return { ok: true, amountPaid: clamped, paymentStatus: derivePaymentStatus(total, clamped) };
+  const amountPaid = Number(row.amount_paid);
+  const balanceDue = Number(row.balance_due);
+  return {
+    ok: true,
+    paymentId: row.payment_id,
+    amountPaid,
+    balanceDue,
+    paymentStatus: derivePaymentStatus(amountPaid + balanceDue, amountPaid),
+  };
 }
 
 /**
@@ -1328,36 +1457,108 @@ export async function getPurchaseById(id: number): Promise<PurchaseDetail | null
   };
 }
 
-/** Records a (possibly partial) payment against a purchase — what you've paid the vendor. */
-export async function updatePurchasePayment(id: number, amountPaid: number): Promise<PaymentUpdateResult> {
-  if (!Number.isFinite(amountPaid) || amountPaid < 0) {
-    return { ok: false, error: "Amount paid must be 0 or more." };
+/**
+ * Records a payment made against a purchase — what you've paid the
+ * vendor — the purchase-side mirror of recordInvoicePayment() above.
+ */
+export async function recordPurchasePayment(
+  id: number,
+  amount: number,
+  mode: PaymentMode = "cash",
+  reference = ""
+): Promise<PaymentRecordResult> {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Enter an amount greater than 0." };
   }
+  const cleanMode: PaymentMode = PAYMENT_MODES.some((m) => m.value === mode) ? mode : "cash";
+  const cleanReference = (reference ?? "").trim();
 
   if (isDemoMode()) {
-    return updateDemoPurchasePayment(id, amountPaid);
+    return recordDemoPurchasePayment(id, amount, cleanMode, cleanReference);
+  }
+
+  const { data, error } = await getClient().rpc("record_purchase_payment", {
+    p_purchase_id: id,
+    p_amount: amount,
+    p_mode: cleanMode,
+    p_reference: cleanReference,
+  });
+
+  if (error) {
+    return { ok: false, error: parsePaymentError(error.message) };
+  }
+
+  const row = (data as { payment_id: number; amount_paid: unknown; balance_due: unknown }[] | null)?.[0];
+  if (!row) return { ok: false, error: "Failed to record the payment. Please try again." };
+
+  const amountPaid = Number(row.amount_paid);
+  const balanceDue = Number(row.balance_due);
+  return {
+    ok: true,
+    paymentId: row.payment_id,
+    amountPaid,
+    balanceDue,
+    paymentStatus: derivePaymentStatus(amountPaid + balanceDue, amountPaid),
+  };
+}
+
+const PAYMENT_SELECT = "id, direction, party_id, invoice_id, purchase_id, amount, mode, reference, created_at";
+
+type PaymentSelectRow = {
+  id: number;
+  direction: string;
+  party_id: number | null;
+  invoice_id: number | null;
+  purchase_id: number | null;
+  amount: unknown;
+  mode: string | null;
+  reference: string | null;
+  created_at: string;
+};
+
+/**
+ * The payments ledger, newest first — every rupee collected from a
+ * customer or paid to a vendor. Pass a filter to scope it to one party, or
+ * one specific invoice/purchase; omit it for the full Cash & Bank history.
+ * Party names are fetched in a second pass and merged in, same two-query
+ * approach getParties() uses, rather than relying on PostgREST's embedded-
+ * relationship shape (which varies by how the FK is declared).
+ */
+export async function getPayments(filter?: PaymentFilter): Promise<PaymentRecord[]> {
+  if (isDemoMode()) {
+    return getDemoPayments(filter);
   }
 
   const supabase = getClient();
-  const { data: purchaseRow, error: fetchError } = await supabase
-    .from("purchases")
-    .select("total, status")
-    .eq("id", id)
-    .maybeSingle();
+  let query = supabase.from("payments").select(PAYMENT_SELECT).order("created_at", { ascending: false });
+  if (filter?.partyId != null) query = query.eq("party_id", filter.partyId);
+  if (filter?.invoiceId != null) query = query.eq("invoice_id", filter.invoiceId);
+  if (filter?.purchaseId != null) query = query.eq("purchase_id", filter.purchaseId);
 
-  if (fetchError) throw fetchError;
-  if (!purchaseRow) return { ok: false, error: "Purchase not found." };
-  if (purchaseRow.status === "voided") {
-    return { ok: false, error: "Cannot record payment on a voided purchase." };
+  const { data, error } = await query;
+  if (error) throw error;
+  const rows = (data ?? []) as PaymentSelectRow[];
+
+  const partyIds = Array.from(new Set(rows.map((r) => r.party_id).filter((id): id is number => id != null)));
+  const partyNameById = new Map<number, string>();
+  if (partyIds.length > 0) {
+    const { data: partyRows, error: partyError } = await supabase.from("parties").select("id, name").in("id", partyIds);
+    if (partyError) throw partyError;
+    for (const p of partyRows ?? []) partyNameById.set(p.id, p.name);
   }
 
-  const total = Number(purchaseRow.total);
-  const clamped = Math.max(0, Math.min(amountPaid, total));
-
-  const { error } = await supabase.from("purchases").update({ amount_paid: clamped }).eq("id", id);
-  if (error) throw error;
-
-  return { ok: true, amountPaid: clamped, paymentStatus: derivePaymentStatus(total, clamped) };
+  return rows.map((r) => ({
+    id: r.id,
+    direction: r.direction === "out" ? "out" : "in",
+    partyId: r.party_id ?? null,
+    partyName: r.party_id != null ? partyNameById.get(r.party_id) ?? "" : "",
+    invoiceId: r.invoice_id ?? null,
+    purchaseId: r.purchase_id ?? null,
+    amount: Number(r.amount),
+    mode: (r.mode ?? "cash") as PaymentMode,
+    reference: r.reference ?? "",
+    createdAt: r.created_at,
+  }));
 }
 
 /**
@@ -1543,7 +1744,7 @@ export async function updateParty(id: number, input: PartyInput): Promise<PartyR
  */
 export async function getPartyLedger(
   id: number
-): Promise<{ party: Party; invoices: InvoiceSummary[]; purchases: PurchaseSummary[] } | null> {
+): Promise<{ party: Party; invoices: InvoiceSummary[]; purchases: PurchaseSummary[]; payments: PaymentRecord[] } | null> {
   if (isDemoMode()) {
     return getDemoPartyLedger(id);
   }
@@ -1559,6 +1760,7 @@ export async function getPartyLedger(
   if (!partyRow) return null;
 
   const party = toParty(partyRow);
+  const payments = await getPayments({ partyId: id });
 
   if (party.type === "vendor") {
     const { data, error } = await supabase
@@ -1567,7 +1769,7 @@ export async function getPartyLedger(
       .eq("party_id", id)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return { party, invoices: [], purchases: (data ?? []).map(toPurchaseSummary) };
+    return { party, invoices: [], purchases: (data ?? []).map(toPurchaseSummary), payments };
   }
 
   const { data, error } = await supabase
@@ -1577,7 +1779,7 @@ export async function getPartyLedger(
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return { party, invoices: (data ?? []).map(toInvoiceSummary), purchases: [] };
+  return { party, invoices: (data ?? []).map(toInvoiceSummary), purchases: [], payments };
 }
 
 /** Recent manual stock corrections, newest first — for the Stock Entry audit log. */

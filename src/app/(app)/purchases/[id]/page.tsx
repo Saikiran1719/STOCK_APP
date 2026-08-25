@@ -6,6 +6,27 @@ import Link from "next/link";
 
 type PaymentStatus = "unpaid" | "partial" | "paid";
 type PurchaseStatus = "active" | "voided";
+type PayMode = "cash" | "bank" | "upi" | "cheque" | "other";
+
+const PAY_MODE_OPTIONS: { value: PayMode; label: string }[] = [
+  { value: "cash", label: "Cash" },
+  { value: "bank", label: "Bank transfer" },
+  { value: "upi", label: "UPI" },
+  { value: "cheque", label: "Cheque" },
+  { value: "other", label: "Other" },
+];
+
+function payModeLabel(mode: PayMode) {
+  return PAY_MODE_OPTIONS.find((m) => m.value === mode)?.label ?? mode;
+}
+
+type PaymentEntry = {
+  id: number;
+  amount: number;
+  mode: PayMode;
+  reference: string;
+  createdAt: string;
+};
 
 type PurchaseItem = {
   productName: string;
@@ -44,7 +65,10 @@ export default function PurchaseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [amountPaidInput, setAmountPaidInput] = useState<number | "">("");
+  const [payments, setPayments] = useState<PaymentEntry[]>([]);
+  const [payAmount, setPayAmount] = useState<number | "">("");
+  const [payMode, setPayMode] = useState<PayMode>("cash");
+  const [payReference, setPayReference] = useState("");
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [payMessage, setPayMessage] = useState("");
 
@@ -71,10 +95,15 @@ export default function PurchaseDetailPage() {
         return;
       }
       setPurchase(data.purchase);
-      setAmountPaidInput(data.purchase.amountPaid);
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         setCurrency(prodData.currencySymbol || "");
+      }
+
+      const payRes = await fetch(`/api/payments?purchaseId=${params.id}`);
+      if (payRes.ok) {
+        const payData = await payRes.json();
+        setPayments(payData.payments ?? []);
       }
     } catch {
       setError("Failed to reach the server.");
@@ -90,21 +119,23 @@ export default function PurchaseDetailPage() {
 
   async function handleRecordPayment(e: FormEvent) {
     e.preventDefault();
-    if (amountPaidInput === "") return;
+    if (payAmount === "" || payAmount <= 0) return;
     setPayMessage("");
     setPaySubmitting(true);
     try {
       const res = await fetch(`/api/purchases/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountPaid: amountPaidInput }),
+        body: JSON.stringify({ amount: payAmount, mode: payMode, reference: payReference }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setPayMessage(data.error || "Failed to update payment.");
+        setPayMessage(data.error || "Failed to record the payment.");
         return;
       }
-      setPayMessage("Payment updated.");
+      setPayMessage("Payment recorded.");
+      setPayAmount("");
+      setPayReference("");
       await load();
     } finally {
       setPaySubmitting(false);
@@ -265,34 +296,83 @@ export default function PurchaseDetailPage() {
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
           <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
             <h2 className="mb-4 text-sm font-semibold text-ink">💳 Record payment</h2>
+            <p className="-mt-2 mb-4 text-xs text-muted">
+              Balance due {money(Math.max(0, purchase.total - purchase.amountPaid))}
+            </p>
             <form onSubmit={handleRecordPayment} className="flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="pay-amount">
+                    Amount paid
+                  </label>
+                  <input
+                    id="pay-amount"
+                    type="number"
+                    min={0}
+                    max={purchase.total - purchase.amountPaid}
+                    step="0.01"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted" htmlFor="pay-mode">
+                    Mode
+                  </label>
+                  <select
+                    id="pay-mode"
+                    value={payMode}
+                    onChange={(e) => setPayMode(e.target.value as PayMode)}
+                    className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  >
+                    {PAY_MODE_OPTIONS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="amount-paid">
-                  Amount paid
+                <label className="mb-1 block text-xs font-medium text-muted" htmlFor="pay-reference">
+                  Reference <span className="text-muted">(optional — cheque no., UTR, etc.)</span>
                 </label>
                 <input
-                  id="amount-paid"
-                  type="number"
-                  min={0}
-                  max={purchase.total}
-                  value={amountPaidInput}
-                  onChange={(e) => setAmountPaidInput(e.target.value === "" ? "" : Number(e.target.value))}
+                  id="pay-reference"
+                  type="text"
+                  value={payReference}
+                  onChange={(e) => setPayReference(e.target.value)}
                   className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
                 />
-                <p className="mt-1 text-xs text-muted">
-                  Total {money(purchase.total)} — balance due{" "}
-                  {money(Math.max(0, purchase.total - (typeof amountPaidInput === "number" ? amountPaidInput : 0)))}
-                </p>
               </div>
               <button
                 type="submit"
-                disabled={paySubmitting || amountPaidInput === ""}
+                disabled={paySubmitting || payAmount === "" || payAmount <= 0}
                 className="self-start rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
               >
                 {paySubmitting ? "Saving…" : "Save payment"}
               </button>
               {payMessage && <p className="text-sm text-muted">{payMessage}</p>}
             </form>
+
+            {payments.length > 0 && (
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Payment history</p>
+                <ul className="flex flex-col gap-1.5 text-sm">
+                  {payments.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 text-ink">
+                      <span className="text-muted">
+                        {new Date(p.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })} ·{" "}
+                        {payModeLabel(p.mode)}
+                        {p.reference && ` · ${p.reference}`}
+                      </span>
+                      <span className="font-medium">{money(p.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">

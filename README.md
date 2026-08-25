@@ -3,10 +3,11 @@
 A billing and stock console: build a sale on an invoice-style entry grid (pick items,
 qty, an optional discount — price and GST fill in automatically) and create a printable
 GST invoice that reduces stock, record vendor purchases (stocks in with a real cost and
-vendor on record), track payment and void mistaken invoices/purchases, browse/reprint
-every invoice ever placed, run monthly GST/sales reports, manage stock/products/GST
-rates, and keep a reusable party master — customers and vendors alike — with a running
-ledger per party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
+vendor on record), collect/pay money with a mode (cash/bank/UPI/cheque/other) and a
+running Cash & Bank ledger, void mistaken invoices/purchases, browse/reprint every
+invoice ever placed, run monthly GST/sales reports, manage stock/products/GST rates, and
+keep a reusable party master — customers and vendors alike — with a running ledger per
+party — all backed by Supabase (Postgres). Password-gated, deployed on Vercel.
 
 ## Look and feel
 
@@ -54,9 +55,19 @@ ledger per party — all backed by Supabase (Postgres). Password-gated, deployed
     item correctly on its own discounted base. `unit_cost` stored per line stays the
     original rate; `subtotal` is the discounted taxable value. `getInvoices()` /
     `getInvoiceById()` read invoices back for the list and reprint screens.
-  - `updateInvoicePayment()` records `amount_paid` on an invoice; payment status
-    (unpaid/partial/paid) is always derived from `amount_paid` vs `total`, never stored
-    separately, so the two can't drift out of sync.
+  - `recordInvoicePayment()` calls the `record_invoice_payment` Postgres function: adds
+    an amount (with a mode and optional reference) to what's already been paid and logs
+    it to the `payments` table, atomically — not a "type the new total" overwrite, so
+    every rupee collected has a mode and timestamp on record, not just a single number
+    that could silently jump around. Rejects an amount over the actual balance due
+    (returned in the error) rather than clamping it, so a typo is caught, not discarded.
+    `recordPurchasePayment()` is the purchase-side mirror. Payment status
+    (unpaid/partial/paid) is still always derived from `amount_paid` vs `total`, never
+    stored separately, so the two can't drift out of sync — `payments` is the ledger
+    behind that running total, not a replacement for it.
+  - `getPayments(filter?)` reads the `payments` ledger, newest first — the whole Cash &
+    Bank history, or (via `{partyId}` / `{invoiceId}` / `{purchaseId}`) just one party's
+    or one document's payments, the same function powering all three views.
   - `voidInvoice()` calls the `void_invoice` Postgres function — atomically restores
     stock for every line item and marks the invoice voided, in one transaction, so a
     void can't partially restore stock. Requires a reason; voided invoices are excluded
@@ -83,7 +94,7 @@ ledger per party — all backed by Supabase (Postgres). Password-gated, deployed
     outstanding/payable balance — `type` selects whether that's computed from `invoices`
     (customers) or `purchases` (vendors), the two tables share column names for exactly
     this reason.
-  - `recordPurchase()` / `getPurchases()` / `getPurchaseById()` / `updatePurchasePayment()`
+  - `recordPurchase()` / `getPurchases()` / `getPurchaseById()` / `recordPurchasePayment()`
     / `voidPurchase()` are the purchase-side mirror of the invoice functions above —
     `recordPurchase()` calls the `record_purchase` Postgres function, which stocks in
     every item and resolves/creates a vendor party the same way `place_invoice()` does
@@ -95,11 +106,12 @@ ledger per party — all backed by Supabase (Postgres). Password-gated, deployed
   create + PATCH price/GST), `restock` (POST), `stock-adjustments` (GET history + POST
   remove), `settings` (GET + PUT), `order` (POST, places a multi-item invoice — accepts
   an optional `partyId` and `discountPercent`), `invoices` (GET list), `invoices/[id]` (GET one + PATCH
-  payment, for the reprint page), `invoices/[id]/void` (POST), `invoices/export` (POST,
-  builds and streams back an `.xlsx` file), `purchases` (GET list + POST record — accepts
-  an optional `partyId`), `purchases/[id]` (GET one + PATCH payment), `purchases/[id]/void`
-  (POST), `parties` (GET list-with-balances, `?type=customer|vendor` + POST create),
-  `parties/[id]` (GET party + their invoice-or-purchase ledger + PATCH update), `reports`
+  `{amount, mode, reference}` to record a payment, for the reprint page), `invoices/[id]/void` (POST),
+  `invoices/export` (POST, builds and streams back an `.xlsx` file), `purchases` (GET list + POST record — accepts
+  an optional `partyId`), `purchases/[id]` (GET one + PATCH `{amount, mode, reference}` to record a payment),
+  `purchases/[id]/void` (POST), `parties` (GET list-with-balances, `?type=customer|vendor` + POST create),
+  `parties/[id]` (GET party + their invoice-or-purchase ledger + PATCH update), `payments`
+  (GET the Cash & Bank ledger; `?partyId=` / `?invoiceId=` / `?purchaseId=` narrows it), `reports`
   (GET, `?month=YYYY-MM`).
 - `src/proxy.ts` — gates every page/API route behind a signed session cookie
   (`iron-session`), except `/login` and `/api/login`.
@@ -124,7 +136,8 @@ ledger per party — all backed by Supabase (Postgres). Password-gated, deployed
   - `parties/[id]/page.tsx` — a party's own details (editable) plus their full
     transaction ledger — every invoice billed to them if they're a customer, or every
     purchase recorded against them if they're a vendor, newest first, linking through to
-    each one's detail/print view.
+    each one's detail/print view — and, below that, every payment ever collected from or
+    paid to them, with its mode and reference.
   - `stock/page.tsx` — **Stock**: every product's cost, GST rate, current stock and
     status, in a searchable bordered/striped table.
   - `invoices/page.tsx` — **Invoices**: every invoice ever placed, newest first, with a
@@ -143,9 +156,11 @@ ledger per party — all backed by Supabase (Postgres). Password-gated, deployed
     `print:` classes when actually printed — use the Print button, or the browser's own
     print dialog / Ctrl+P). Sets the page title to `Invoice No: INV-000123`, which
     browsers use as the print header and default PDF filename. Below the invoice
-    (screen only): a "Record payment" form and a "Void invoice" control (asks for a
-    reason, then restores stock). A voided invoice shows a red VOIDED banner — printed
-    too, not just on screen — instead of those controls.
+    (screen only): a "Record payment" form (amount, mode, optional reference — adds to
+    what's already paid rather than overwriting it, and lists that invoice's own payment
+    history underneath) and a "Void invoice" control (asks for a reason, then restores
+    stock). A voided invoice shows a red VOIDED banner — printed too, not just on screen
+    — instead of those controls.
   - `purchases/page.tsx` — **Purchases**: every vendor bill ever recorded, newest first,
     with the same date/search filtering as Invoices, plus a "+ New purchase" form — pick
     or type a vendor, add items with the actual cost paid per unit (pre-filled from the
@@ -153,8 +168,14 @@ ledger per party — all backed by Supabase (Postgres). Password-gated, deployed
     what you really paid). Submitting stocks in every item and goes straight to the new
     purchase's detail screen.
   - `purchases/[id]/page.tsx` — a purchase's line items and totals (CGST/SGST split,
-    same as an invoice), plus screen-only "Record payment" and "Void purchase" controls —
+    same as an invoice), plus screen-only "Record payment" (same amount/mode/reference
+    form and payment-history list as the invoice page) and "Void purchase" controls —
     voiding reverses the stock this purchase added instead of restoring it.
+  - `payments/page.tsx` — **Cash & Bank**: every payment ever recorded, across every
+    invoice and purchase, as one ledger — In/Out pills, party, the invoice/purchase it
+    was against, mode, reference, and a running balance computed chronologically (so
+    filtering the view never changes the historical numbers). Filter by type, mode, date,
+    or a party/reference search; three tiles up top total in / total out / net balance.
   - `reports/page.tsx` — **Reports**: pick a month, see invoice count, taxable sales,
     GST collected, amount received/outstanding, and a per-GST-rate breakdown.
   - `stock-entry/page.tsx` — **Stock Entry**: add stock, remove stock (with required

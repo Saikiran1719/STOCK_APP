@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getInvoiceById, getSettings, updateInvoicePayment } from "@/lib/db";
+import { getInvoiceById, getSettings, recordInvoicePayment, type PaymentMode } from "@/lib/db";
 
 export async function GET(
   request: NextRequest,
@@ -33,7 +33,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid invoice id." }, { status: 400 });
   }
 
-  let body: { amountPaid?: number };
+  let body: { amount?: number; mode?: PaymentMode; reference?: string };
   try {
     body = await request.json();
   } catch {
@@ -41,13 +41,13 @@ export async function PATCH(
   }
 
   try {
-    const result = await updateInvoicePayment(invoiceId, Number(body.amountPaid));
+    const result = await recordInvoicePayment(invoiceId, Number(body.amount), body.mode, body.reference);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
     return NextResponse.json(result);
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Failed to update payment." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to record the payment." }, { status: 500 });
   }
 }

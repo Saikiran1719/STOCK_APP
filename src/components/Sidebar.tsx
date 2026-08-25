@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/stock", label: "Stock", icon: "📦" },
   { href: "/invoices", label: "Invoices", icon: "🧾" },
   { href: "/purchases", label: "Purchases", icon: "📥" },
+  { href: "/payments", label: "Cash & Bank", icon: "💳" },
   { href: "/reports", label: "Reports", icon: "📊" },
   { href: "/stock-entry", label: "Stock Entry", icon: "▤" },
   { href: "/settings", label: "Settings", icon: "⚙" },

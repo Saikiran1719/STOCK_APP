@@ -625,3 +625,123 @@ begin
   where id = p_purchase_id;
 end;
 $$;
+
+-- --------------------------------------------------------------------------
+-- Payments: a proper history of every rupee collected from a customer or
+-- paid to a vendor, with a mode (cash/bank/upi/cheque/other) and an
+-- optional reference — replaces the old "Record payment" flow, which just
+-- overwrote invoices.amount_paid / purchases.amount_paid to a new absolute
+-- number with no record of how or when it came in. amount_paid stays as
+-- the running total on the invoice/purchase (still what the payment pills
+-- and reports read); `payments` is the append-only ledger behind it, which
+-- is what the Cash & Bank screen and each party's ledger read from.
+-- --------------------------------------------------------------------------
+
+create table if not exists payments (
+  id bigint generated always as identity primary key,
+  direction text not null check (direction in ('in', 'out')),
+  party_id bigint references parties(id),
+  invoice_id bigint references invoices(id),
+  purchase_id bigint references purchases(id),
+  amount numeric not null,
+  mode text not null default 'cash' check (mode in ('cash', 'bank', 'upi', 'cheque', 'other')),
+  reference text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists payments_party_id_idx on payments(party_id);
+create index if not exists payments_invoice_id_idx on payments(invoice_id);
+create index if not exists payments_purchase_id_idx on payments(purchase_id);
+create index if not exists payments_created_at_idx on payments(created_at);
+
+-- Adds p_amount to an invoice's running amount_paid and logs the payment
+-- row, atomically, in one transaction — a partial failure can't log a
+-- payment without also updating the balance, or vice versa. Rejects an
+-- amount that would overpay the invoice (with the actual balance due in
+-- the error) rather than silently clamping it, so a typo is caught instead
+-- of quietly discarded.
+create or replace function record_invoice_payment(
+  p_invoice_id bigint,
+  p_amount numeric,
+  p_mode text default 'cash',
+  p_reference text default ''
+)
+returns table (payment_id bigint, amount_paid numeric, balance_due numeric)
+language plpgsql
+as $$
+declare
+  v_invoice invoices%rowtype;
+  v_balance numeric;
+  v_payment_id bigint;
+  v_new_paid numeric;
+begin
+  select * into v_invoice from invoices where id = p_invoice_id for update;
+  if not found then
+    raise exception 'invoice_not_found';
+  end if;
+  if v_invoice.status = 'voided' then
+    raise exception 'invoice_voided';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'invalid_amount';
+  end if;
+
+  v_balance := v_invoice.total - v_invoice.amount_paid;
+  if p_amount > v_balance then
+    raise exception 'exceeds_balance:%', v_balance;
+  end if;
+
+  insert into payments (direction, party_id, invoice_id, amount, mode, reference)
+  values ('in', v_invoice.party_id, p_invoice_id, p_amount, coalesce(nullif(p_mode, ''), 'cash'), coalesce(p_reference, ''))
+  returning id into v_payment_id;
+
+  v_new_paid := v_invoice.amount_paid + p_amount;
+  update invoices set amount_paid = v_new_paid where id = p_invoice_id;
+
+  return query select v_payment_id, v_new_paid, v_invoice.total - v_new_paid;
+end;
+$$;
+
+-- Purchase-side mirror of record_invoice_payment() above — money paid OUT
+-- to a vendor instead of IN from a customer.
+create or replace function record_purchase_payment(
+  p_purchase_id bigint,
+  p_amount numeric,
+  p_mode text default 'cash',
+  p_reference text default ''
+)
+returns table (payment_id bigint, amount_paid numeric, balance_due numeric)
+language plpgsql
+as $$
+declare
+  v_purchase purchases%rowtype;
+  v_balance numeric;
+  v_payment_id bigint;
+  v_new_paid numeric;
+begin
+  select * into v_purchase from purchases where id = p_purchase_id for update;
+  if not found then
+    raise exception 'purchase_not_found';
+  end if;
+  if v_purchase.status = 'voided' then
+    raise exception 'purchase_voided';
+  end if;
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'invalid_amount';
+  end if;
+
+  v_balance := v_purchase.total - v_purchase.amount_paid;
+  if p_amount > v_balance then
+    raise exception 'exceeds_balance:%', v_balance;
+  end if;
+
+  insert into payments (direction, party_id, purchase_id, amount, mode, reference)
+  values ('out', v_purchase.party_id, p_purchase_id, p_amount, coalesce(nullif(p_mode, ''), 'cash'), coalesce(p_reference, ''))
+  returning id into v_payment_id;
+
+  v_new_paid := v_purchase.amount_paid + p_amount;
+  update purchases set amount_paid = v_new_paid where id = p_purchase_id;
+
+  return query select v_payment_id, v_new_paid, v_purchase.total - v_new_paid;
+end;
+$$;
