@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
+import { DirectionPill } from "@/components/Pill";
+import StatTile from "@/components/StatTile";
 
 type Direction = "in" | "out";
 type PayMode = "cash" | "bank" | "upi" | "cheque" | "other";
@@ -125,9 +128,9 @@ export default function PaymentsPage() {
       </header>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Tile label="Total in" value={money(totalIn)} tone="ok" />
-        <Tile label="Total out" value={money(totalOut)} tone="err" />
-        <Tile
+        <StatTile label="Total in" value={money(totalIn)} tone="ok" />
+        <StatTile label="Total out" value={money(totalOut)} tone="err" />
+        <StatTile
           label="Net balance"
           value={`${netBalance < 0 ? "− " : ""}${money(netBalance)}`}
           tone={netBalance >= 0 ? "default" : "warn"}
@@ -140,7 +143,7 @@ export default function PaymentsPage() {
         <p className="text-sm text-err">{loadError}</p>
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-card">
             <div className="min-w-[180px] flex-1">
               <label className="mb-1 block text-xs font-medium text-muted" htmlFor="search">
                 Search party or reference
@@ -214,7 +217,7 @@ export default function PaymentsPage() {
             )}
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <h2 className="text-sm font-semibold text-ink">
                 {filtered.length} payment{filtered.length === 1 ? "" : "s"}
@@ -231,7 +234,7 @@ export default function PaymentsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                    <tr className={TABLE_HEAD_ROW}>
                       <Th>Date</Th>
                       <Th>Type</Th>
                       <Th>Party</Th>
@@ -295,66 +298,5 @@ export default function PaymentsPage() {
         </>
       )}
     </main>
-  );
-}
-
-function Tile({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "ok" | "warn" | "err";
-}) {
-  const color = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : tone === "err" ? "text-err" : "text-ink";
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-0.5 text-2xl font-bold tabular-nums ${color}`}>{value}</p>
-    </div>
-  );
-}
-
-function DirectionPill({ direction }: { direction: Direction }) {
-  if (direction === "in") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
-        ↓ In
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
-      ↑ Out
-    </span>
-  );
-}
-
-function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children?: React.ReactNode;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <td
-      className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
-    >
-      {children}
-    </td>
   );
 }

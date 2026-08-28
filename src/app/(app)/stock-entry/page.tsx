@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import ProductAvatar from "@/components/ProductAvatar";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
 
 type Product = { id: number; name: string; cost: number; stock: number; gstRate: number; hsnCode: string };
 type Message = { type: "ok" | "error"; text: string };
@@ -586,7 +587,7 @@ export default function StockEntryPage() {
         </div>
       )}
 
-      <section className="mt-6 rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+      <section className="mt-6 rounded-2xl border border-border bg-card shadow-card">
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-sm font-semibold text-ink">📋 Recent stock adjustments</h2>
           <p className="text-xs text-muted">Every manual stock correction, with its remarks.</p>
@@ -599,18 +600,18 @@ export default function StockEntryPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
-                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Date</th>
-                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Product</th>
-                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">Qty removed</th>
-                  <th className="whitespace-nowrap border-b border-r border-border px-5 py-3">New stock</th>
-                  <th className="whitespace-nowrap border-b border-border px-5 py-3">Remarks</th>
+                <tr className={TABLE_HEAD_ROW}>
+                  <Th>Date</Th>
+                  <Th>Product</Th>
+                  <Th>Qty removed</Th>
+                  <Th>New stock</Th>
+                  <Th>Remarks</Th>
                 </tr>
               </thead>
               <tbody>
                 {adjustments.map((a, i) => (
                   <tr key={a.id} className={`${i % 2 === 1 ? "bg-stripe" : ""} hover:bg-accent-soft`}>
-                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">
+                    <Td className="text-muted">
                       {new Date(a.createdAt).toLocaleString(undefined, {
                         year: "numeric",
                         month: "short",
@@ -618,16 +619,16 @@ export default function StockEntryPage() {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
-                    </td>
-                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3">
+                    </Td>
+                    <Td>
                       <div className="flex items-center gap-2 font-medium text-ink">
                         <ProductAvatar name={a.productName} />
                         {a.productName}
                       </div>
-                    </td>
-                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-err">-{a.qty}</td>
-                    <td className="whitespace-nowrap border-b border-r border-border px-5 py-3 text-muted">{a.newStock}</td>
-                    <td className="whitespace-nowrap border-b border-border px-5 py-3 text-muted">{a.remarks}</td>
+                    </Td>
+                    <Td className="text-err">-{a.qty}</Td>
+                    <Td className="text-muted">{a.newStock}</Td>
+                    <Td className="text-muted">{a.remarks}</Td>
                   </tr>
                 ))}
               </tbody>
@@ -655,7 +656,7 @@ function AccordionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <button
         type="button"
         onClick={onToggle}

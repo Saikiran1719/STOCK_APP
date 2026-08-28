@@ -32,19 +32,19 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center bg-gradient-to-br from-navy to-navy-2 px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gold text-2xl font-bold text-navy shadow-lg">
+    <main className="login-scene relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-10">
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <span className="login-mark mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-2xl font-bold text-white">
             C
           </span>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
             Billing &amp; stock console
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">CounterBook</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink">CounterBook</h1>
         </div>
 
-        <div className="rounded-xl border-t-4 border-gold bg-card p-6 shadow-2xl sm:p-8">
+        <div className="login-card rounded-2xl p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-ink">Welcome back</h2>
           <p className="mb-6 mt-1 text-sm text-muted">Enter the access password to continue.</p>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -57,20 +57,20 @@ export default function LoginPage() {
               autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-line px-3 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+              className="rounded-lg border border-line bg-white px-3 py-2.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
             {error && <p className="text-sm text-err">{error}</p>}
             <button
               type="submit"
               disabled={loading || !password}
-              className="mt-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45"
+              className="shadow-button-accent mt-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-accent-dark disabled:opacity-45 disabled:shadow-none"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-white/40">
+        <p className="mt-6 text-center text-xs text-muted">
           One shared password gets your whole team in — from any device.
         </p>
       </div>

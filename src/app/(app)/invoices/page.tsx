@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
+import { PaymentPill, VoidedPill } from "@/components/Pill";
 
 type PaymentStatus = "unpaid" | "partial" | "paid";
 type InvoiceStatus = "active" | "voided";
@@ -131,7 +133,7 @@ export default function InvoicesPage() {
         <p className="text-sm text-err">{loadError}</p>
       ) : (
         <>
-          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)] sm:flex-row sm:items-end">
+          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-card sm:flex-row sm:items-end">
             <div className="flex-1">
               <label className="mb-1 block text-xs font-medium text-muted" htmlFor="search">
                 Search customer or product
@@ -170,7 +172,7 @@ export default function InvoicesPage() {
             )}
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <h2 className="text-sm font-semibold text-ink">
                 {filtered.length} invoice{filtered.length === 1 ? "" : "s"}
@@ -203,7 +205,7 @@ export default function InvoicesPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                    <tr className={TABLE_HEAD_ROW}>
                       <Th>Invoice</Th>
                       <Th>Date</Th>
                       <Th>Customer</Th>
@@ -223,11 +225,7 @@ export default function InvoicesPage() {
                         >
                           <Td className="font-medium text-ink">
                             <span className={voided ? "line-through" : ""}>{inv.invoiceNo}</span>
-                            {voided && (
-                              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
-                                ⊘ Voided
-                              </span>
-                            )}
+                            {voided && <VoidedPill />}
                           </Td>
                           <Td className="text-muted">
                             {new Date(inv.createdAt).toLocaleDateString(undefined, {
@@ -270,55 +268,5 @@ export default function InvoicesPage() {
         </>
       )}
     </main>
-  );
-}
-
-function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children?: React.ReactNode;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <td
-      className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
-    >
-      {children}
-    </td>
-  );
-}
-
-function PaymentPill({ status }: { status: PaymentStatus }) {
-  if (status === "paid") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
-        ✓ Paid
-      </span>
-    );
-  }
-  if (status === "partial") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn">
-        ◐ Partial
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
-      ! Unpaid
-    </span>
   );
 }

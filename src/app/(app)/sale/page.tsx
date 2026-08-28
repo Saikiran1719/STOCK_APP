@@ -170,7 +170,7 @@ export default function NewSalePage() {
         <p className="text-sm text-err">{loadError}</p>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <section className="overflow-hidden rounded-xl border border-ink bg-white">
+          <section className="overflow-hidden rounded-2xl border border-ink bg-white">
             {/* Header: Bill To (top-left) + discount, laid out like the printed invoice's own header block */}
             <div className="border-b-2 border-ink p-4 sm:p-6">
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Bill to</p>

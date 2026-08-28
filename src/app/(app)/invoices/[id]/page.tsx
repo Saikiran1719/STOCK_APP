@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PrintButton from "@/components/PrintButton";
+import { PaymentPill } from "@/components/Pill";
 
 type PaymentStatus = "unpaid" | "partial" | "paid";
 type InvoiceStatus = "active" | "voided";
@@ -218,7 +219,7 @@ export default function InvoicePage() {
       </div>
 
       {invoice.status === "voided" && (
-        <div className="mb-4 rounded-xl border-2 border-err bg-err-bg px-4 py-3 text-err">
+        <div className="mb-4 rounded-2xl border-2 border-err bg-err-bg px-4 py-3 text-err">
           <p className="text-lg font-bold uppercase tracking-widest">⚠ Voided</p>
           {invoice.voidReason && <p className="text-sm">Reason: {invoice.voidReason}</p>}
         </div>
@@ -370,7 +371,7 @@ export default function InvoicePage() {
 
       {invoice.status === "active" && (
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 print:hidden">
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <h2 className="mb-4 text-sm font-semibold text-ink">💳 Record payment</h2>
             <p className="-mt-2 mb-4 text-xs text-muted">
               Balance due {money(Math.max(0, invoice.total - invoice.amountPaid))}
@@ -451,7 +452,7 @@ export default function InvoicePage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <h2 className="mb-1 text-sm font-semibold text-ink">🚫 Void this invoice</h2>
             <p className="mb-4 text-xs text-muted">
               Restores stock for every item on this invoice. Cannot be undone.
@@ -502,28 +503,6 @@ export default function InvoicePage() {
         </div>
       )}
     </main>
-  );
-}
-
-function PaymentPill({ status }: { status: PaymentStatus }) {
-  if (status === "paid") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
-        ✓ Paid
-      </span>
-    );
-  }
-  if (status === "partial") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn">
-        ◐ Partial
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
-      ! Unpaid
-    </span>
   );
 }
 

@@ -3,6 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
+import { PaymentPill, VoidedPill } from "@/components/Pill";
+import StatTile from "@/components/StatTile";
 
 type PaymentStatus = "unpaid" | "partial" | "paid";
 type TxStatus = "active" | "voided";
@@ -210,7 +213,7 @@ export default function PartyDetailPage() {
       {editing && (
         <form
           onSubmit={handleSave}
-          className="mb-6 flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]"
+          className="mb-6 flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-card"
         >
           <div>
             <label className="mb-1 block text-xs font-medium text-muted" htmlFor="edit-party-name">
@@ -289,16 +292,16 @@ export default function PartyDetailPage() {
       )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Tile label={isVendor ? "Total purchased" : "Total billed"} value={money(totalBilled)} />
-        <Tile label="Total paid" value={money(totalPaid)} tone="ok" />
-        <Tile
+        <StatTile label={isVendor ? "Total purchased" : "Total billed"} value={money(totalBilled)} />
+        <StatTile label="Total paid" value={money(totalPaid)} tone="ok" />
+        <StatTile
           label={isVendor ? "Payable" : "Outstanding"}
           value={money(outstanding)}
           tone={outstanding > 0 ? "warn" : "default"}
         />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
         <div className="border-b border-border px-5 py-4">
           <h2 className="text-sm font-semibold text-ink">
             {isVendor ? "📥 Purchase history" : "🧾 Invoice history"}
@@ -314,7 +317,7 @@ export default function PartyDetailPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                  <tr className={TABLE_HEAD_ROW}>
                     <Th>Purchase</Th>
                     <Th>Date</Th>
                     <Th>Items</Th>
@@ -333,11 +336,7 @@ export default function PartyDetailPage() {
                       >
                         <Td className="font-medium text-ink">
                           <span className={voided ? "line-through" : ""}>{purchaseNumberFor(pu.id)}</span>
-                          {voided && (
-                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
-                              ⊘ Voided
-                            </span>
-                          )}
+                          {voided && <VoidedPill />}
                         </Td>
                         <Td className="text-muted">
                           {new Date(pu.createdAt).toLocaleDateString(undefined, {
@@ -369,7 +368,7 @@ export default function PartyDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                <tr className={TABLE_HEAD_ROW}>
                   <Th>Invoice</Th>
                   <Th>Date</Th>
                   <Th>Items</Th>
@@ -388,11 +387,7 @@ export default function PartyDetailPage() {
                     >
                       <Td className="font-medium text-ink">
                         <span className={voided ? "line-through" : ""}>{inv.invoiceNo}</span>
-                        {voided && (
-                          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-err-bg px-2 py-0.5 text-xs font-medium text-err">
-                            ⊘ Voided
-                          </span>
-                        )}
+                        {voided && <VoidedPill />}
                       </Td>
                       <Td className="text-muted">
                         {new Date(inv.createdAt).toLocaleDateString(undefined, {
@@ -421,7 +416,7 @@ export default function PartyDetailPage() {
       </div>
 
       {payments.length > 0 && (
-        <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+        <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-sm font-semibold text-ink">💳 Payment history</h2>
             <p className="text-xs text-muted">
@@ -431,7 +426,7 @@ export default function PartyDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                <tr className={TABLE_HEAD_ROW}>
                   <Th>Date</Th>
                   <Th>Against</Th>
                   <Th>Mode</Th>
@@ -473,73 +468,5 @@ export default function PartyDetailPage() {
         </div>
       )}
     </main>
-  );
-}
-
-function Tile({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "ok" | "warn";
-}) {
-  const color = tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : "text-ink";
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-0.5 text-2xl font-bold tabular-nums ${color}`}>{value}</p>
-    </div>
-  );
-}
-
-function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children?: React.ReactNode;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <td
-      className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
-    >
-      {children}
-    </td>
-  );
-}
-
-function PaymentPill({ status }: { status: PaymentStatus }) {
-  if (status === "paid") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
-        ✓ Paid
-      </span>
-    );
-  }
-  if (status === "partial") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn">
-        ◐ Partial
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
-      ! Unpaid
-    </span>
   );
 }

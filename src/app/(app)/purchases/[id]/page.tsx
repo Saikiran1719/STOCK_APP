@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
+import { PaymentPill } from "@/components/Pill";
 
 type PaymentStatus = "unpaid" | "partial" | "paid";
 type PurchaseStatus = "active" | "voided";
@@ -198,13 +200,13 @@ export default function PurchaseDetailPage() {
       </Link>
 
       {purchase.status === "voided" && (
-        <div className="mb-4 mt-3 rounded-xl border-2 border-err bg-err-bg px-4 py-3 text-err">
+        <div className="mb-4 mt-3 rounded-2xl border-2 border-err bg-err-bg px-4 py-3 text-err">
           <p className="text-lg font-bold uppercase tracking-widest">⚠ Voided</p>
           {purchase.voidReason && <p className="text-sm">Reason: {purchase.voidReason}</p>}
         </div>
       )}
 
-      <div className="mt-3 overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+      <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-card shadow-card">
         <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-accent">Purchase</p>
@@ -239,7 +241,7 @@ export default function PurchaseDetailPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+              <tr className={TABLE_HEAD_ROW}>
                 <Th>Product</Th>
                 <Th>HSN/SAC</Th>
                 <Th align="right">Qty</Th>
@@ -297,7 +299,7 @@ export default function PurchaseDetailPage() {
 
       {purchase.status === "active" && (
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <h2 className="mb-4 text-sm font-semibold text-ink">💳 Record payment</h2>
             <p className="-mt-2 mb-4 text-xs text-muted">
               Balance due {money(Math.max(0, purchase.total - purchase.amountPaid))}
@@ -378,7 +380,7 @@ export default function PurchaseDetailPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <h2 className="mb-1 text-sm font-semibold text-ink">🚫 Void this purchase</h2>
             <p className="mb-4 text-xs text-muted">
               Reverses stock for every item on this purchase. Cannot be undone.
@@ -429,55 +431,5 @@ export default function PurchaseDetailPage() {
         </div>
       )}
     </main>
-  );
-}
-
-function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children?: React.ReactNode;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <td
-      className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
-    >
-      {children}
-    </td>
-  );
-}
-
-function PaymentPill({ status }: { status: PaymentStatus }) {
-  if (status === "paid") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
-        ✓ Paid
-      </span>
-    );
-  }
-  if (status === "partial") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn">
-        ◐ Partial
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
-      ! Unpaid
-    </span>
   );
 }

@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ProductAvatar from "@/components/ProductAvatar";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
+import { StockStatusPill } from "@/components/Pill";
 
 type Product = { id: number; name: string; cost: number; stock: number; gstRate: number; hsnCode: string };
-
-const LOW_STOCK_THRESHOLD = 10;
 
 export default function StockPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -58,7 +58,7 @@ export default function StockPage() {
       ) : loadError ? (
         <p className="text-sm text-err">{loadError}</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
           <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-sm font-semibold text-ink">📦 {filtered.length} product{filtered.length === 1 ? "" : "s"}</h2>
             <input
@@ -78,7 +78,7 @@ export default function StockPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                  <tr className={TABLE_HEAD_ROW}>
                     <Th>Product</Th>
                     <Th>HSN/SAC</Th>
                     <Th align="right">Cost</Th>
@@ -108,7 +108,7 @@ export default function StockPage() {
                         {p.stock}
                       </Td>
                       <Td>
-                        <StatusPill stock={p.stock} />
+                        <StockStatusPill stock={p.stock} />
                       </Td>
                     </tr>
                   ))}
@@ -119,55 +119,5 @@ export default function StockPage() {
         </div>
       )}
     </main>
-  );
-}
-
-function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`whitespace-nowrap border-b border-r border-border px-4 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children: React.ReactNode;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <td
-      className={`whitespace-nowrap border-b border-r border-border px-4 py-3 last:border-r-0 ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
-    >
-      {children}
-    </td>
-  );
-}
-
-function StatusPill({ stock }: { stock: number }) {
-  if (stock <= 0) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-err-bg px-2.5 py-0.5 text-xs font-medium text-err">
-        ✕ Out of stock
-      </span>
-    );
-  }
-  if (stock <= LOW_STOCK_THRESHOLD) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn">
-        ⚠ Low stock
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-ok-bg px-2.5 py-0.5 text-xs font-medium text-ok">
-      ✓ In stock
-    </span>
   );
 }

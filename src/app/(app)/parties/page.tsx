@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { Th, Td, TABLE_HEAD_ROW } from "@/components/DataTable";
 
 type PartyType = "customer" | "vendor";
 
@@ -166,7 +167,7 @@ export default function PartiesPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-6 flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-[0_2px_10px_rgba(29,45,62,0.05)]"
+          className="mb-6 flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-card"
         >
           <div>
             <label className="mb-1 block text-xs font-medium text-muted" htmlFor="party-name">
@@ -249,7 +250,7 @@ export default function PartiesPage() {
       ) : loadError ? (
         <p className="text-sm text-err">{loadError}</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(29,45,62,0.05)]">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
             <input
               type="text"
@@ -276,7 +277,7 @@ export default function PartiesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-head text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                  <tr className={TABLE_HEAD_ROW}>
                     <Th>Name</Th>
                     <Th>Phone</Th>
                     <Th>GSTIN</Th>
@@ -313,33 +314,5 @@ export default function PartiesPage() {
         </div>
       )}
     </main>
-  );
-}
-
-function Th({ children, align = "left" }: { children?: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <th className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${align === "right" ? "text-right" : "text-left"}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  align = "left",
-  className = "",
-}: {
-  children?: React.ReactNode;
-  align?: "left" | "right";
-  className?: string;
-}) {
-  return (
-    <td
-      className={`whitespace-nowrap border-b border-r border-border px-5 py-3 last:border-r-0 ${
-        align === "right" ? "text-right" : "text-left"
-      } ${className}`}
-    >
-      {children}
-    </td>
   );
 }
